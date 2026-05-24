@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { useUserStore } from '../../store/userStore';
 import { useTaskStore } from '../../store/taskStore';
@@ -8,6 +8,7 @@ import { colors } from '../../constants/colors';
 import { DEFAULT_TASKS } from '../../constants/defaultTasks';
 import { Pager } from '../../components/Pager';
 import { supabase } from '../../lib/supabase';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 

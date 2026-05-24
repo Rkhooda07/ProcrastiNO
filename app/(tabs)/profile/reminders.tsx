@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView, SafeAreaView, Pressable, ActivityIndicator } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Switch, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserStore } from '../../../store/userStore';
 import { useReminderStore } from '../../../store/reminderStore';
 import { colors } from '../../../constants/colors';
+
+// Notifications are disabled for Expo Go compatibility in SDK 56 MVP
+// To enable, you would need a Development Build.
 
 export default function RemindersScreen() {
   const { currentUserId } = useUserStore();
@@ -15,51 +18,12 @@ export default function RemindersScreen() {
   useEffect(() => {
     if (currentUserId) {
       fetchSettings(currentUserId);
-      requestPermissions();
     }
   }, [currentUserId]);
 
-  async function requestPermissions() {
-    const { status } = await Notifications.requestPermissionsAsync();
-    if (status !== 'granted') {
-       // Handle permission denied
-    }
-  }
-
   const handleToggle = async (key: string, value: boolean) => {
     await updateSettings({ [key]: value });
-    scheduleReminders({ ...settings!, [key]: value });
   };
-
-  async function scheduleReminders(currentSettings: any) {
-    await Notifications.cancelAllScheduledNotificationsAsync();
-
-    if (currentSettings.water_enabled) {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "💧 Water time!",
-          body: "Stay hydrated — drink a glass of water",
-        },
-        trigger: {
-          seconds: currentSettings.water_interval_min * 60,
-          repeats: true,
-        },
-      });
-    }
-
-    if (currentSettings.posture_enabled) {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "🧘 Posture check",
-          body: "Sit up straight and take a deep breath",
-        },
-        trigger: {
-          seconds: currentSettings.posture_interval_min * 60,
-          repeats: true,
-        },
-      });
-    }
-  }
 
   if (isLoading) {
     return (
@@ -70,7 +34,7 @@ export default function RemindersScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
       <Stack.Screen options={{ 
         title: 'Reminders',
         headerLeft: () => (
@@ -128,7 +92,7 @@ export default function RemindersScreen() {
         <View style={styles.infoBox}>
           <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
           <Text style={styles.infoText}>
-            Reminders are scheduled locally on your device to ensure privacy and reliability.
+            Local notifications are currently disabled in Expo Go. You can still use this page to manage your preferences!
           </Text>
         </View>
       </ScrollView>
