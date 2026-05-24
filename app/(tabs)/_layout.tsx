@@ -64,6 +64,12 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="profile/reminders"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

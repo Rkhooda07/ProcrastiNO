@@ -100,7 +100,7 @@ export default function ProfileScreen() {
 
         <View style={styles.menu}>
           <Link href="/profile/reminders" asChild>
-            <Pressable style={[styles.menuItem, { borderBottomWidth: 0 }]}>
+            <Pressable style={StyleSheet.flatten([styles.menuItem, { borderBottomWidth: 0 }])}>
               <View style={styles.menuItemLeft}>
                 <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
                 <Text style={styles.menuItemText}>Reminders</Text>
