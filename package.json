@@ -1,0 +1,33 @@
+{
+  "name": "procrastino",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
+    "@react-native-async-storage/async-storage": "^3.1.0",
+    "@supabase/supabase-js": "^2.106.1",
+    "expo": "~56.0.4",
+    "expo-constants": "~56.0.15",
+    "expo-haptics": "~56.0.3",
+    "expo-linking": "~56.0.11",
+    "expo-notifications": "~56.0.13",
+    "expo-router": "~56.2.6",
+    "expo-status-bar": "~56.0.4",
+    "expo-web-browser": "~56.0.5",
+    "react": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-url-polyfill": "^3.0.0",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "private": true
+}
