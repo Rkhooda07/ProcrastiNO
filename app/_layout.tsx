@@ -1,37 +1,22 @@
 import { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
-import { supabase } from '../lib/supabase';
-import { useAuthStore } from '../store/authStore';
+import { useUserStore } from '../store/userStore';
 import { StatusBar } from 'expo-status-bar';
 
 export default function RootLayout() {
-  const { setSession, session, isLoading } = useAuthStore();
+  const { hasChosenUser } = useUserStore();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
+    const isSelectionPage = segments[0] === 'select-user';
 
-    supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (isLoading) return;
-
-    const inAuthGroup = segments[0] === '(auth)';
-
-    if (!session && !inAuthGroup) {
-      // Redirect to login if not authenticated
-      router.replace('/login');
-    } else if (session && inAuthGroup) {
-      // Redirect to tasks if authenticated
+    if (!hasChosenUser && !isSelectionPage) {
+      router.replace('/select-user');
+    } else if (hasChosenUser && isSelectionPage) {
       router.replace('/tasks');
     }
-  }, [session, segments, isLoading]);
+  }, [hasChosenUser, segments]);
 
   return (
     <>

@@ -2,53 +2,51 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, ActivityIndicator, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useRouter } from 'expo-router';
-import { useAuthStore } from '../../store/authStore';
+import { useUserStore } from '../../store/userStore';
 import { useTaskStore } from '../../store/taskStore';
 import { colors } from '../../constants/colors';
 import { supabase } from '../../lib/supabase';
 
 export default function ProfileScreen() {
-  const { user, pair, signOut } = useAuthStore();
+  const { currentUserId, partnerId } = useUserStore();
   const { tasks } = useTaskStore();
   const [stats, setStats] = useState<any>(null);
   const [partnerStats, setPartnerStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const pairUserId = pair?.user_a === user?.id ? pair?.user_b : pair?.user_a;
-
   useEffect(() => {
-    if (user) {
+    if (currentUserId) {
       fetchStats();
     }
-  }, [user, pairUserId]);
+  }, [currentUserId, partnerId]);
 
   async function fetchStats() {
     setLoading(true);
     const { data: myStats } = await supabase
       .from('user_stats')
       .select('*')
-      .eq('user_id', user?.id)
+      .eq('user_id', currentUserId)
       .single();
 
     if (myStats) setStats(myStats);
 
-    if (pairUserId) {
+    if (partnerId) {
       const { data: pStats } = await supabase
         .from('user_stats')
         .select('*')
-        .eq('user_id', pairUserId)
+        .eq('user_id', partnerId)
         .single();
       if (pStats) setPartnerStats(pStats);
     }
     setLoading(false);
   }
 
-  const myTasksToday = tasks.filter(t => t.owner_id === user?.id);
+  const myTasksToday = tasks.filter(t => t.owner_id === currentUserId);
   const myCompletedToday = myTasksToday.filter(t => t.is_done).length;
   const myProgress = myTasksToday.length > 0 ? myCompletedToday / myTasksToday.length : 0;
 
-  const partnerTasksToday = tasks.filter(t => t.owner_id === pairUserId);
+  const partnerTasksToday = tasks.filter(t => t.owner_id === partnerId);
   const partnerCompletedToday = partnerTasksToday.filter(t => t.is_done).length;
 
   if (loading) {
@@ -64,9 +62,9 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarText}>{user?.email?.charAt(0).toUpperCase()}</Text>
+            <Text style={styles.avatarText}>P</Text>
           </View>
-          <Text style={styles.userName}>{user?.email?.split('@')[0]}</Text>
+          <Text style={styles.userName}>{currentUserId === 'user-alpha-unique-id' ? 'User 1' : 'User 2'}</Text>
           <View style={styles.streakBadge}>
             <Ionicons name="flame" size={20} color={colors.streakOrange} />
             <Text style={styles.streakText}>{stats?.streak_count || 0}-day streak</Text>
@@ -101,7 +99,7 @@ export default function ProfileScreen() {
 
         <View style={styles.menu}>
           <Link href="/profile/reminders" asChild>
-            <Pressable style={styles.menuItem}>
+            <Pressable style={[styles.menuItem, { borderBottomWidth: 0 }]}>
               <View style={styles.menuItemLeft}>
                 <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
                 <Text style={styles.menuItemText}>Reminders</Text>
@@ -109,13 +107,6 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
             </Pressable>
           </Link>
-
-          <Pressable style={styles.menuItem} onPress={signOut}>
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="log-out-outline" size={22} color="#FF6B6B" />
-              <Text style={[styles.menuItemText, { color: '#FF6B6B' }]}>Sign Out</Text>
-            </View>
-          </Pressable>
         </View>
       </ScrollView>
     </SafeAreaView>

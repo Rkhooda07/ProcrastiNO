@@ -1,31 +1,30 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, SafeAreaView } from 'react-native';
 import PagerView from 'react-native-pager-view';
-import { useAuthStore } from '../../store/authStore';
+import { useUserStore } from '../../store/userStore';
 import { useTaskStore } from '../../store/taskStore';
 import { TaskItem } from '../../components/TaskItem';
 import { colors } from '../../constants/colors';
 import { DEFAULT_TASKS } from '../../constants/defaultTasks';
 import { Pager } from '../../components/Pager';
+import { supabase } from '../../lib/supabase';
 
 const { width } = Dimensions.get('window');
 
 export default function TasksScreen() {
-  const { user, pair } = useAuthStore();
+  const { currentUserId, partnerId } = useUserStore();
   const { tasks, isLoading, fetchTasks, toggleTask, subscribeToTasks } = useTaskStore();
   const [currentPage, setCurrentPage] = useState(0);
   const pagerRef = useRef<any>(null);
 
-  const pairUserId = pair?.user_a === user?.id ? pair?.user_b : pair?.user_a;
-
   useEffect(() => {
-    if (user) {
-      fetchTasks(user.id, pairUserId);
-      seedTasksIfNeeded(user.id);
-      const unsubscribe = subscribeToTasks(user.id, pairUserId);
+    if (currentUserId) {
+      fetchTasks(currentUserId, partnerId);
+      seedTasksIfNeeded(currentUserId);
+      const unsubscribe = subscribeToTasks(currentUserId, partnerId);
       return () => unsubscribe();
     }
-  }, [user, pairUserId]);
+  }, [currentUserId, partnerId]);
 
   async function seedTasksIfNeeded(userId: string) {
     const today = new Date().toISOString().split('T')[0];
@@ -43,12 +42,12 @@ export default function TasksScreen() {
         is_done: false,
       }));
       await supabase.from('tasks').insert(tasksToInsert);
-      fetchTasks(userId, pairUserId);
+      fetchTasks(currentUserId!, partnerId);
     }
   }
 
-  const myTasks = tasks.filter((t) => t.owner_id === user?.id);
-  const friendTasks = tasks.filter((t) => t.owner_id === pairUserId);
+  const myTasks = tasks.filter((t) => t.owner_id === currentUserId);
+  const friendTasks = tasks.filter((t) => t.owner_id === partnerId);
 
   const renderTaskList = (data: any[], isOwner: boolean, title: string) => (
     <View style={styles.page}>

@@ -1,6 +1,5 @@
 import React, { forwardRef } from 'react';
-import { Platform, View, ScrollView, Dimensions, StyleSheet } from 'react-native';
-import PagerView from 'react-native-pager-view';
+import { View, ScrollView, Dimensions, StyleSheet } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -12,39 +11,26 @@ interface PagerProps {
 }
 
 export const Pager = forwardRef<any, PagerProps>(({ children, initialPage = 0, onPageSelected, style }, ref) => {
-  if (Platform.OS === 'web') {
-    return (
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(e) => {
-          const contentOffset = e.nativeEvent.contentOffset.x;
-          const page = Math.round(contentOffset / width);
-          if (onPageSelected) {
-            onPageSelected({ nativeEvent: { position: page } });
-          }
-        }}
-        style={[style, { flex: 1 }]}
-        contentOffset={{ x: initialPage * width, y: 0 }}
-      >
-        {children.map((child, index) => (
-          <View key={index} style={{ width, flex: 1 }}>
-            {child}
-          </View>
-        ))}
-      </ScrollView>
-    );
-  }
-
   return (
-    <PagerView
-      ref={ref}
-      style={style}
-      initialPage={initialPage}
-      onPageSelected={onPageSelected}
+    <ScrollView
+      horizontal
+      pagingEnabled
+      showsHorizontalScrollIndicator={false}
+      onMomentumScrollEnd={(e) => {
+        const contentOffset = e.nativeEvent.contentOffset.x;
+        const page = Math.round(contentOffset / width);
+        if (onPageSelected) {
+          onPageSelected({ nativeEvent: { position: page } });
+        }
+      }}
+      style={[style, { flex: 1 }]}
+      contentOffset={{ x: initialPage * width, y: 0 }}
     >
-      {children}
-    </PagerView>
+      {React.Children.map(children, (child, index) => (
+        <View key={index} style={{ width, flex: 1 }}>
+          {child}
+        </View>
+      ))}
+    </ScrollView>
   );
 });

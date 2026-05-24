@@ -3,21 +3,21 @@ import { View, Text, StyleSheet, Switch, ScrollView, SafeAreaView, Pressable, Ac
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
-import { useAuthStore } from '../../../store/authStore';
+import { useUserStore } from '../../../store/userStore';
 import { useReminderStore } from '../../../store/reminderStore';
 import { colors } from '../../../constants/colors';
 
 export default function RemindersScreen() {
-  const { user } = useAuthStore();
+  const { currentUserId } = useUserStore();
   const { settings, isLoading, fetchSettings, updateSettings } = useReminderStore();
   const router = useRouter();
 
   useEffect(() => {
-    if (user) {
-      fetchSettings(user.id);
+    if (currentUserId) {
+      fetchSettings(currentUserId);
       requestPermissions();
     }
-  }, [user]);
+  }, [currentUserId]);
 
   async function requestPermissions() {
     const { status } = await Notifications.requestPermissionsAsync();
