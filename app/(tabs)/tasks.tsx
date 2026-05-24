@@ -6,7 +6,7 @@ import { useTaskStore } from '../../store/taskStore';
 import { TaskItem } from '../../components/TaskItem';
 import { colors } from '../../constants/colors';
 import { DEFAULT_TASKS } from '../../constants/defaultTasks';
-import { supabase } from '../../lib/supabase';
+import { Pager } from '../../components/Pager';
 
 const { width } = Dimensions.get('window');
 
@@ -14,7 +14,7 @@ export default function TasksScreen() {
   const { user, pair } = useAuthStore();
   const { tasks, isLoading, fetchTasks, toggleTask, subscribeToTasks } = useTaskStore();
   const [currentPage, setCurrentPage] = useState(0);
-  const pagerRef = useRef<PagerView>(null);
+  const pagerRef = useRef<any>(null);
 
   const pairUserId = pair?.user_a === user?.id ? pair?.user_b : pair?.user_a;
 
@@ -94,7 +94,7 @@ export default function TasksScreen() {
         <View style={[styles.indicator, currentPage === 1 && styles.indicatorActive]} />
       </View>
       
-      <PagerView
+      <Pager
         ref={pagerRef}
         style={styles.pagerView}
         initialPage={0}
@@ -106,7 +106,7 @@ export default function TasksScreen() {
         <View key="2">
           {renderTaskList(friendTasks, false, "Partner's Tasks")}
         </View>
-      </PagerView>
+      </Pager>
     </SafeAreaView>
   );
 }
