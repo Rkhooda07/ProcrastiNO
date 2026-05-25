@@ -1,10 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, SafeAreaView, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useUserStore, USER_A_ID, USER_B_ID } from '../store/userStore';
+import { useUserStore, RAKSHIT_ID, SNEH_ID } from '../store/userStore';
 import { colors } from '../constants/colors';
-import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function UserSelection() {
   const { setUser } = useUserStore();
@@ -18,40 +16,33 @@ export default function UserSelection() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Welcome to ProcrastiNO</Text>
-          <Text style={styles.subtitle}>Who are you today?</Text>
-        </View>
+        <Text style={styles.title}>Who's using ProcrastiNO?</Text>
 
-        <View style={styles.options}>
+        <View style={styles.profileContainer}>
           <Pressable 
-            style={({ pressed }) => [styles.optionCard, pressed && styles.pressed]}
-            onPress={() => handleSelect(USER_A_ID)}
+            style={({ pressed }) => [styles.profileCard, pressed && styles.pressed]}
+            onPress={() => handleSelect(RAKSHIT_ID)}
           >
-            <View style={[styles.iconCircle, { backgroundColor: colors.accent }]}>
-              <Ionicons name="person" size={32} color="#FFF" />
+            <View style={[styles.avatarBox, { backgroundColor: '#A89AE6' }]}>
+              <Text style={styles.avatarLetter}>R</Text>
             </View>
-            <Text style={styles.optionTitle}>Me (User 1)</Text>
-            <Text style={styles.optionDesc}>I will track my daily goals here.</Text>
+            <Text style={styles.name}>Rakshit</Text>
           </Pressable>
 
           <Pressable 
-            style={({ pressed }) => [styles.optionCard, pressed && styles.pressed]}
-            onPress={() => handleSelect(USER_B_ID)}
+            style={({ pressed }) => [styles.profileCard, pressed && styles.pressed]}
+            onPress={() => handleSelect(SNEH_ID)}
           >
-            <View style={[styles.iconCircle, { backgroundColor: colors.accentMint }]}>
-              <Ionicons name="person" size={32} color="#FFF" />
+            <View style={[styles.avatarBox, { backgroundColor: '#FFB7B2' }]}>
+              <Text style={styles.avatarLetter}>S</Text>
             </View>
-            <Text style={styles.optionTitle}>Partner (User 2)</Text>
-            <Text style={styles.optionDesc}>I will track my daily goals here.</Text>
+            <Text style={styles.name}>Sneh</Text>
           </Pressable>
         </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            This choice will be saved on this device.
-          </Text>
-        </View>
+        <Pressable style={styles.manageBtn}>
+          <Text style={styles.manageBtnText}>MANAGE PROFILES</Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -60,72 +51,62 @@ export default function UserSelection() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#141414', // Classic dark background for "Netflix" vibe
   },
   content: {
     flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-  },
-  header: {
     alignItems: 'center',
-    marginBottom: 48,
+    justifyContent: 'center',
+    padding: 20,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 12,
+    fontSize: 22,
+    color: '#FFFFFF',
+    fontWeight: '500',
+    marginBottom: 40,
   },
-  subtitle: {
-    fontSize: 18,
-    color: colors.textSecondary,
+  profileContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 30,
   },
-  options: {
-    gap: 20,
-  },
-  optionCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 24,
+  profileCard: {
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 4,
+    width: 120,
   },
   pressed: {
+    transform: [{ scale: 0.95 }],
     opacity: 0.9,
-    transform: [{ scale: 0.98 }],
   },
-  iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  avatarBox: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  optionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: 8,
+  avatarLetter: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
-  optionDesc: {
+  name: {
+    fontSize: 16,
+    color: '#808080',
+    fontWeight: '400',
+  },
+  manageBtn: {
+    marginTop: 80,
+    borderWidth: 1,
+    borderColor: '#808080',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+  },
+  manageBtnText: {
+    color: '#808080',
     fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  footer: {
-    marginTop: 48,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 14,
-    color: colors.textMuted,
+    letterSpacing: 2,
   },
 });

@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator } from 'react-native';
-import PagerView from 'react-native-pager-view';
-import { useUserStore } from '../../store/userStore';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { useUserStore, RAKSHIT_ID, SNEH_ID } from '../../store/userStore';
 import { useTaskStore } from '../../store/taskStore';
 import { TaskItem } from '../../components/TaskItem';
 import { colors } from '../../constants/colors';
@@ -9,13 +8,15 @@ import { DEFAULT_TASKS } from '../../constants/defaultTasks';
 import { Pager } from '../../components/Pager';
 import { supabase } from '../../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
 export default function TasksScreen() {
-  const { currentUserId, partnerId } = useUserStore();
-  const { tasks, isLoading, fetchTasks, toggleTask, subscribeToTasks } = useTaskStore();
+  const { currentUserId, partnerId, partnerName } = useUserStore();
+  const { tasks, isLoading, fetchTasks, toggleTask, addTask, subscribeToTasks } = useTaskStore();
   const [currentPage, setCurrentPage] = useState(0);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
   const pagerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -43,14 +44,20 @@ export default function TasksScreen() {
         is_done: false,
       }));
       await supabase.from('tasks').insert(tasksToInsert);
-      fetchTasks(currentUserId!, partnerId);
+      if (currentUserId) fetchTasks(currentUserId, partnerId);
     }
   }
+
+  const handleAddTask = async (targetId: string) => {
+    if (!newTaskTitle.trim()) return;
+    await addTask(newTaskTitle.trim(), targetId);
+    setNewTaskTitle('');
+  };
 
   const myTasks = tasks.filter((t) => t.owner_id === currentUserId);
   const friendTasks = tasks.filter((t) => t.owner_id === partnerId);
 
-  const renderTaskList = (data: any[], isOwner: boolean, title: string) => (
+  const renderTaskList = (data: any[], isOwner: boolean, title: string, ownerId: string) => (
     <View style={styles.page}>
       <View style={styles.headerSection}>
         <Text style={styles.pageTitle}>{title}</Text>
@@ -68,13 +75,22 @@ export default function TasksScreen() {
             onToggle={toggleTask}
           />
         )}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No tasks for today yet.</Text>
+        ListFooterComponent={
+          <View style={styles.inlineInputContainer}>
+            <Ionicons name="add-outline" size={22} color={colors.textMuted} style={styles.inlineInputIcon} />
+            <TextInput
+              style={styles.inlineInput}
+              placeholder="New Task"
+              placeholderTextColor={colors.textMuted}
+              value={newTaskTitle}
+              onChangeText={setNewTaskTitle}
+              onSubmitEditing={() => handleAddTask(ownerId)}
+              blurOnSubmit={false}
+            />
           </View>
         }
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
@@ -88,25 +104,30 @@ export default function TasksScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.indicatorContainer}>
-        <View style={[styles.indicator, currentPage === 0 && styles.indicatorActive]} />
-        <View style={[styles.indicator, currentPage === 1 && styles.indicatorActive]} />
-      </View>
-      
-      <Pager
-        ref={pagerRef}
-        style={styles.pagerView}
-        initialPage={0}
-        onPageSelected={(e) => setCurrentPage(e.nativeEvent.position)}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
       >
-        <View key="1">
-          {renderTaskList(myTasks, true, "My Tasks")}
+        <View style={styles.indicatorContainer}>
+          <View style={[styles.indicator, currentPage === 0 && styles.indicatorActive]} />
+          <View style={[styles.indicator, currentPage === 1 && styles.indicatorActive]} />
         </View>
-        <View key="2">
-          {renderTaskList(friendTasks, false, "Partner's Tasks")}
-        </View>
-      </Pager>
+        
+        <Pager
+          ref={pagerRef}
+          style={styles.pagerView}
+          initialPage={0}
+          onPageSelected={(e) => setCurrentPage(e.nativeEvent.position)}
+        >
+          <View key="1">
+            {renderTaskList(myTasks, true, "My Tasks", currentUserId!)}
+          </View>
+          <View key="2">
+            {renderTaskList(friendTasks, false, `${partnerName}'s Tasks`, partnerId!)}
+          </View>
+        </Pager>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -144,6 +165,27 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 40,
+  },
+  inlineInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    marginTop: 4,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  inlineInputIcon: {
+    marginRight: 12,
+  },
+  inlineInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.textPrimary,
+    fontWeight: '400',
   },
   indicatorContainer: {
     flexDirection: 'row',

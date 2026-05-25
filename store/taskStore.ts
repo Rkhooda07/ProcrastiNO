@@ -16,6 +16,7 @@ interface TaskState {
   isLoading: boolean;
   fetchTasks: (userId: string, pairUserId: string | null) => Promise<void>;
   toggleTask: (taskId: string, isDone: boolean) => Promise<void>;
+  addTask: (title: string, ownerId: string) => Promise<void>;
   subscribeToTasks: (userId: string, pairUserId: string | null) => () => void;
 }
 
@@ -57,6 +58,18 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           t.id === taskId ? { ...t, is_done: isDone, done_at } : t
         ),
       }));
+    }
+  },
+  addTask: async (title, ownerId) => {
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({ title, owner_id: ownerId, date: today, is_done: false })
+      .select()
+      .single();
+
+    if (data && !error) {
+      set((state) => ({ tasks: [...state.tasks, data] }));
     }
   },
   subscribeToTasks: (userId, pairUserId) => {

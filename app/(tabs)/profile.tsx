@@ -100,7 +100,7 @@ export default function ProfileScreen() {
 
         <View style={styles.menu}>
           <Link href="/profile/reminders" asChild>
-            <Pressable style={StyleSheet.flatten([styles.menuItem, { borderBottomWidth: 0 }])}>
+            <Pressable style={styles.menuItem}>
               <View style={styles.menuItemLeft}>
                 <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
                 <Text style={styles.menuItemText}>Reminders</Text>
@@ -108,7 +108,21 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
             </Pressable>
           </Link>
-        </View>
+
+          <Pressable 
+            style={[styles.menuItem, { borderBottomWidth: 0 }]} 
+            onPress={() => {
+              const { resetUser } = useUserStore.getState();
+              resetUser();
+              router.replace('/select-user');
+            }}
+          >
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="swap-horizontal-outline" size={22} color={colors.accent} />
+              <Text style={[styles.menuItemText, { color: colors.accent }]}>Switch Profile</Text>
+            </View>
+          </Pressable>
+          </View>
       </ScrollView>
     </SafeAreaView>
   );

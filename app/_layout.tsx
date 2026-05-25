@@ -4,11 +4,13 @@ import { useUserStore } from '../store/userStore';
 import { StatusBar } from 'expo-status-bar';
 
 export default function RootLayout() {
-  const { hasChosenUser } = useUserStore();
+  const { hasChosenUser, _hasHydrated } = useUserStore();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
+    if (!_hasHydrated) return;
+
     const isSelectionPage = segments[0] === 'select-user';
 
     if (!hasChosenUser && !isSelectionPage) {
@@ -16,7 +18,7 @@ export default function RootLayout() {
     } else if (hasChosenUser && isSelectionPage) {
       router.replace('/tasks');
     }
-  }, [hasChosenUser, segments]);
+  }, [hasChosenUser, segments, _hasHydrated]);
 
   return (
     <>
