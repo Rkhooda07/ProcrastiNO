@@ -8,14 +8,21 @@ import { Task } from '../store/taskStore';
 interface TaskItemProps {
   task: Task;
   onToggle: (taskId: string, isDone: boolean) => void;
+  onLongPress?: (task: Task) => void;
   isOwner: boolean;
 }
 
-export const TaskItem = ({ task, onToggle, isOwner }: TaskItemProps) => {
+export const TaskItem = ({ task, onToggle, onLongPress, isOwner }: TaskItemProps) => {
   const handlePress = () => {
     if (!isOwner) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onToggle(task.id, !task.is_done);
+  };
+
+  const handleLongPress = () => {
+    if (!isOwner) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    onLongPress?.(task);
   };
 
   return (
@@ -26,7 +33,9 @@ export const TaskItem = ({ task, onToggle, isOwner }: TaskItemProps) => {
         !isOwner && styles.disabled,
       ]}
       onPress={handlePress}
+      onLongPress={handleLongPress}
       disabled={!isOwner}
+      delayLongPress={400}
     >
       <View style={[
         styles.checkbox,
@@ -71,7 +80,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.textMuted,
+    borderColor: '#C7C7CC',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -85,13 +94,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 17,
-    color: '#1C1C1E', // Apple-style pure dark for high contrast
-    fontWeight: '600', // Semibold for better visibility
+    color: '#1C1C1E',
+    fontWeight: '600',
     flex: 1,
   },
   titleDone: {
     textDecorationLine: 'line-through',
-    color: '#AEAEB2', // Lighter for done state
+    color: '#AEAEB2',
   },
   textDisabled: {
     color: colors.textMuted,

@@ -7,6 +7,7 @@ export interface Task {
   title: string;
   date: string;
   is_done: boolean;
+  is_recurring: boolean;
   done_at: string | null;
   created_at: string;
 }
@@ -17,6 +18,8 @@ interface TaskState {
   fetchTasks: (userId: string, pairUserId: string | null) => Promise<void>;
   toggleTask: (taskId: string, isDone: boolean) => Promise<void>;
   addTask: (title: string, ownerId: string) => Promise<void>;
+  deleteTask: (taskId: string) => Promise<void>;
+  makeRecurring: (taskId: string, recurring: boolean) => Promise<void>;
   subscribeToTasks: (userId: string, pairUserId: string | null) => () => void;
 }
 
@@ -30,7 +33,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     let query = supabase
       .from('tasks')
       .select('*')
-      .eq('date', today);
+      .or(`date.eq.${today},is_recurring.eq.true`);
 
     if (pairUserId) {
       query = query.or(`owner_id.eq.${userId},owner_id.eq.${pairUserId}`);
@@ -60,6 +63,20 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       }));
     }
   },
+  makeRecurring: async (taskId, is_recurring) => {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ is_recurring })
+      .eq('id', taskId);
+
+    if (!error) {
+      set((state) => ({
+        tasks: state.tasks.map((t) =>
+          t.id === taskId ? { ...t, is_recurring } : t
+        ),
+      }));
+    }
+  },
   addTask: async (title, ownerId) => {
     const today = new Date().toISOString().split('T')[0];
     const tempId = Math.random().toString(36).substring(7);
@@ -70,6 +87,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       title,
       date: today,
       is_done: false,
+      is_recurring: false,
       done_at: null,
       created_at: new Date().toISOString()
     };
@@ -98,6 +116,20 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           tasks: state.tasks.map(t => t.id === tempId ? data : t)
         };
       });
+    }
+  },
+  deleteTask: async (taskId) => {
+    // Optimistic delete
+    set((state) => ({ tasks: state.tasks.filter(t => t.id !== taskId) }));
+    
+    const { error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', taskId);
+
+    if (error) {
+      console.error('Error deleting task:', error);
+      // We should ideally fetch tasks again or revert, but for MVP keep it simple
     }
   },
   subscribeToTasks: (userId, pairUserId) => {
