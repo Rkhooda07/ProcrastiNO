@@ -62,14 +62,42 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
   addTask: async (title, ownerId) => {
     const today = new Date().toISOString().split('T')[0];
+    const tempId = Math.random().toString(36).substring(7);
+    
+    const newTask: Task = {
+      id: tempId,
+      owner_id: ownerId,
+      title,
+      date: today,
+      is_done: false,
+      done_at: null,
+      created_at: new Date().toISOString()
+    };
+
+    // Optimistically add to state
+    set((state) => ({ tasks: [...state.tasks, newTask] }));
+
     const { data, error } = await supabase
       .from('tasks')
       .insert({ title, owner_id: ownerId, date: today, is_done: false })
       .select()
       .single();
 
-    if (data && !error) {
-      set((state) => ({ tasks: [...state.tasks, data] }));
+    if (error) {
+      console.error('Error adding task:', error);
+      // Rollback on error
+      set((state) => ({ tasks: state.tasks.filter(t => t.id !== tempId) }));
+    } else if (data) {
+      // Replace temp task with real one from DB, but only if listener hasn't added it yet
+      set((state) => {
+        const alreadyAddedByListener = state.tasks.some(t => t.id === data.id);
+        if (alreadyAddedByListener) {
+          return { tasks: state.tasks.filter(t => t.id !== tempId) };
+        }
+        return {
+          tasks: state.tasks.map(t => t.id === tempId ? data : t)
+        };
+      });
     }
   },
   subscribeToTasks: (userId, pairUserId) => {
@@ -91,7 +119,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
           if (payload.eventType === 'INSERT') {
              if (newTask.owner_id === userId || newTask.owner_id === pairUserId) {
-                set((state) => ({ tasks: [...state.tasks, newTask] }));
+                set((state) => {
+                  // Prevent duplicates if already added by addTask
+                  if (state.tasks.some(t => t.id === newTask.id)) return state;
+                  return { tasks: [...state.tasks, newTask] };
+                });
              }
           } else if (payload.eventType === 'UPDATE') {
             set((state) => ({

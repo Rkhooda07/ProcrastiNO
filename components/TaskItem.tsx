@@ -84,13 +84,14 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   title: {
-    fontSize: 16,
-    color: colors.textPrimary,
-    fontWeight: '500',
+    fontSize: 17,
+    color: '#1C1C1E', // Apple-style pure dark for high contrast
+    fontWeight: '600', // Semibold for better visibility
+    flex: 1,
   },
   titleDone: {
     textDecorationLine: 'line-through',
-    color: colors.textSecondary,
+    color: '#AEAEB2', // Lighter for done state
   },
   textDisabled: {
     color: colors.textMuted,

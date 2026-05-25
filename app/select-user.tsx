@@ -8,8 +8,8 @@ export default function UserSelection() {
   const { setUser } = useUserStore();
   const router = useRouter();
 
-  const handleSelect = (id: string) => {
-    setUser(id);
+  const handleSelect = async (id: string) => {
+    await setUser(id);
     router.replace('/tasks');
   };
 

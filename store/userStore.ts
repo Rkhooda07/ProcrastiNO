@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../lib/supabase';
 
-// Fixed IDs for the 2 users
-export const RAKSHIT_ID = 'rakshit-id';
-export const SNEH_ID = 'sneh-id';
+// Fixed IDs for the 2 users (MUST be valid UUIDs for Supabase)
+export const RAKSHIT_ID = '8b693895-7145-4202-8692-06992f7682f6';
+export const SNEH_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
 
 interface UserState {
   currentUserId: string | null;
@@ -13,7 +14,7 @@ interface UserState {
   partnerName: string | null;
   hasChosenUser: boolean;
   _hasHydrated: boolean;
-  setUser: (id: string) => void;
+  setUser: (id: string) => Promise<void>;
   resetUser: () => void;
   setHasHydrated: (state: boolean) => void;
 }
@@ -27,11 +28,16 @@ export const useUserStore = create<UserState>()(
       partnerName: null,
       hasChosenUser: false,
       _hasHydrated: false,
-      setUser: (id: string) => {
+      setUser: async (id: string) => {
         const isRakshit = id === RAKSHIT_ID;
         const currentUserName = isRakshit ? 'Rakshit' : 'Sneh';
         const partnerId = isRakshit ? SNEH_ID : RAKSHIT_ID;
         const partnerName = isRakshit ? 'Sneh' : 'Rakshit';
+        
+        // Seed stats if they don't exist
+        await supabase.from('user_stats').upsert({ user_id: id }, { onConflict: 'user_id' });
+        await supabase.from('user_stats').upsert({ user_id: partnerId }, { onConflict: 'user_id' });
+
         set({ 
           currentUserId: id, 
           currentUserName, 
@@ -52,7 +58,7 @@ export const useUserStore = create<UserState>()(
       setHasHydrated: (state) => set({ _hasHydrated: state }),
     }),
     {
-      name: 'user-storage',
+      name: 'user-storage-v2', // Changed from 'user-storage' to force a clean slate
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

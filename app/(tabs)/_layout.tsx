@@ -43,7 +43,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="checkbox-outline" size={size} color={color} />
           ),
-          headerTitle: 'Daily Tasks',
+          headerTitle: 'ProcrastiNO',
+          headerTitleStyle: {
+            fontSize: 24,
+            fontWeight: '800',
+            color: colors.accent,
+            letterSpacing: -0.5,
+          },
         }}
       />
       <Tabs.Screen
