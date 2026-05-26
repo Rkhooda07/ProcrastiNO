@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
+import { scheduleWellnessNotificationsAsync } from '../lib/notifications';
 
 export interface ReminderSettings {
   user_id: string;
@@ -21,14 +22,15 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
   isLoading: false,
   fetchSettings: async (userId) => {
     set({ isLoading: true });
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('reminder_settings')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (data) {
       set({ settings: data, isLoading: false });
+      await scheduleWellnessNotificationsAsync(data);
     } else {
       // If no settings, create default ones
       const defaultSettings: ReminderSettings = {
@@ -40,6 +42,7 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
       };
       await supabase.from('reminder_settings').insert(defaultSettings);
       set({ settings: defaultSettings, isLoading: false });
+      await scheduleWellnessNotificationsAsync(defaultSettings);
     }
   },
   updateSettings: async (newSettings) => {
@@ -54,6 +57,7 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
 
     if (!error) {
       set({ settings: updated });
+      await scheduleWellnessNotificationsAsync(updated);
     }
   },
 }));

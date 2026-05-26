@@ -7,9 +7,6 @@ import { useUserStore } from '../../../store/userStore';
 import { useReminderStore } from '../../../store/reminderStore';
 import { colors } from '../../../constants/colors';
 
-// Notifications are disabled for Expo Go compatibility in SDK 56 MVP
-// To enable, you would need a Development Build.
-
 export default function RemindersScreen() {
   const { currentUserId } = useUserStore();
   const { settings, isLoading, fetchSettings, updateSettings } = useReminderStore();
@@ -92,7 +89,7 @@ export default function RemindersScreen() {
         <View style={styles.infoBox}>
           <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
           <Text style={styles.infoText}>
-            Local notifications are currently disabled in Expo Go. You can still use this page to manage your preferences!
+            Water and posture reminders schedule locally on this device, and task reminders are spaced automatically through the day based on your remaining tasks.
           </Text>
         </View>
       </ScrollView>

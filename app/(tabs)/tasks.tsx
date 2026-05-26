@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import { Calendar } from 'react-native-calendars';
 import { useNavigation } from 'expo-router';
+import { scheduleTaskReminderNotificationsAsync } from '../../lib/notifications';
 
 const { width, height } = Dimensions.get('window');
 
@@ -140,6 +141,16 @@ export default function TasksScreen() {
   const pagerRef = useRef<any>(null);
   const navigation = useNavigation();
   const popAnim = useRef(new Animated.Value(0)).current;
+  const myTasks = tasks.filter((t) => t.owner_id === currentUserId);
+  const friendTasks = tasks.filter((t) => t.owner_id === partnerId);
+  const myTasksReminderKey = useMemo(
+    () =>
+      myTasks
+        .map((task) => `${task.id}:${task.date}:${task.is_done ? '1' : '0'}:${task.is_recurring ? '1' : '0'}`)
+        .sort()
+        .join('|'),
+    [myTasks]
+  );
 
   const currentStreak = useMemo(() => calculateStreak(completedDates), [completedDates]);
   
@@ -195,6 +206,17 @@ export default function TasksScreen() {
     }
   }, [currentUserId, partnerId]);
 
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    void scheduleTaskReminderNotificationsAsync({
+      ownerName: currentUserName,
+      tasks: myTasks,
+    }).catch((error) => {
+      console.warn('Failed to schedule task reminders', error);
+    });
+  }, [currentUserId, currentUserName, myTasksReminderKey]);
+
   const handleAddTask = async (title: string, ownerId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await addTask(title, ownerId);
@@ -216,9 +238,6 @@ export default function TasksScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await makeRecurring(id, newState);
   };
-
-  const myTasks = tasks.filter((t) => t.owner_id === currentUserId);
-  const friendTasks = tasks.filter((t) => t.owner_id === partnerId);
 
   if (isLoading && tasks.length === 0) {
     return (
