@@ -4,7 +4,6 @@ import { useUserStore, RAKSHIT_ID, SNEH_ID } from '../../store/userStore';
 import { useTaskStore, Task } from '../../store/taskStore';
 import { TaskItem } from '../../components/TaskItem';
 import { colors } from '../../constants/colors';
-import { DEFAULT_TASKS } from '../../constants/defaultTasks';
 import { Pager } from '../../components/Pager';
 import { supabase } from '../../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,17 +18,13 @@ const { width, height } = Dimensions.get('window');
 const calculateStreak = (dates: string[]) => {
   if (!dates || dates.length === 0) return 0;
   const sorted = [...new Set(dates)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  
   const todayStr = today.toISOString().split('T')[0];
   const yesterdayStr = yesterday.toISOString().split('T')[0];
-  
   if (sorted[0] !== todayStr && sorted[0] !== yesterdayStr) return 0;
-  
   let streak = 0;
   for (let i = 0; i < sorted.length; i++) {
     const d = new Date(sorted[i]);
@@ -49,7 +44,7 @@ const calculateStreak = (dates: string[]) => {
 };
 
 const TaskList = memo(({ 
-  data, 
+  data = [], 
   isOwner, 
   title, 
   ownerId, 
@@ -138,26 +133,26 @@ const TaskList = memo(({
 
 export default function TasksScreen() {
   const { currentUserId, partnerId, currentUserName, partnerName } = useUserStore();
-  const { tasks, isLoading, completedDates, fetchTasks, toggleTask, addTask, deleteTask, makeRecurring, subscribeToTasks } = useTaskStore();
+  const { tasks = [], isLoading, completedDates = [], fetchTasks, toggleTask, addTask, deleteTask, makeRecurring, subscribeToTasks } = useTaskStore();
   const [currentPage, setCurrentPage] = useState(0);
   const [focusedTask, setFocusedTask] = useState<Task | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const pagerRef = useRef<any>(null);
   const navigation = useNavigation();
-  
   const popAnim = useRef(new Animated.Value(0)).current;
 
   const currentStreak = useMemo(() => calculateStreak(completedDates), [completedDates]);
   
   const markedDates = useMemo(() => {
-    return completedDates.reduce((acc: any, date) => {
-      acc[date] = { 
+    const dates: any = {};
+    completedDates.forEach(date => {
+      dates[date] = { 
         selected: true, 
         selectedColor: colors.accentMint,
         customStyles: { container: { borderRadius: 8 } }
       };
-      return acc;
-    }, {});
+    });
+    return dates;
   }, [completedDates]);
 
   useEffect(() => {
@@ -168,12 +163,12 @@ export default function TasksScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setShowCalendar(true);
           }} 
-          style={{ marginRight: 20, flexDirection: 'row', alignItems: 'center', padding: 4 }}
+          style={{ marginRight: 20, flexDirection: 'row', alignItems: 'center', padding: 8 }}
         >
-          <Text style={{ marginRight: 4, fontWeight: '700', color: colors.streakOrange, fontSize: 16 }}>
+          <Text style={{ marginRight: 4, fontWeight: '800', color: colors.streakOrange, fontSize: 17 }}>
             {currentStreak}
           </Text>
-          <Ionicons name="flame" size={24} color={colors.streakOrange} />
+          <Ionicons name="flame" size={26} color={colors.streakOrange} />
         </Pressable>
       ),
     });
@@ -256,7 +251,7 @@ export default function TasksScreen() {
               data={myTasks} 
               isOwner={true} 
               title="My Tasks" 
-              ownerId={currentUserId!} 
+              ownerId={currentUserId || ''} 
               onToggle={toggleTask}
               onAdd={handleAddTask}
               onLongPress={setFocusedTask}
@@ -266,8 +261,8 @@ export default function TasksScreen() {
             <TaskList 
               data={friendTasks} 
               isOwner={false} 
-              title={`${partnerName}'s Tasks`} 
-              ownerId={partnerId!} 
+              title={`${partnerName || 'Partner'}'s Tasks`} 
+              ownerId={partnerId || ''} 
               onToggle={toggleTask}
               onAdd={handleAddTask}
               onLongPress={setFocusedTask}
@@ -354,7 +349,7 @@ export default function TasksScreen() {
       <Modal
         visible={showCalendar}
         transparent={true}
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => setShowCalendar(false)}
       >
         <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill}>

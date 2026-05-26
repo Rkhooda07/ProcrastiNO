@@ -1,3 +1,5 @@
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 
@@ -16,7 +18,7 @@ interface TaskState {
   tasks: Task[];
   isLoading: boolean;
   completedDates: string[]; 
-  pendingSync: Set<string>; // Track tasks currently syncing to DB
+  pendingSync: Set<string>; 
   fetchTasks: (userId: string, pairUserId: string | null) => Promise<void>;
   toggleTask: (taskId: string, isDone: boolean) => Promise<void>;
   addTask: (title: string, ownerId: string) => Promise<void>;
@@ -46,13 +48,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       query = query.eq('owner_id', userId);
     }
 
-    const { data, error } = await query;
+    const { data } = await query;
     if (data) {
       set({ tasks: data, isLoading: false });
     } else {
       set({ isLoading: false });
     }
-    
     get().fetchStreakData(userId);
   },
   fetchStreakData: async (userId) => {
@@ -68,40 +69,28 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         datesGrouped[t.date].total++;
         if (t.is_done) datesGrouped[t.date].done++;
       });
-
       const completed = Object.keys(datesGrouped).filter(d => 
         datesGrouped[d].total > 0 && datesGrouped[d].total === datesGrouped[d].done
       );
-      
       set({ completedDates: completed });
     }
   },
   toggleTask: async (taskId, isDone) => {
     const done_at = isDone ? new Date().toISOString() : null;
-    
-    // 1. Instant UI update (Optimistic)
     set((state) => ({
       tasks: state.tasks.map((t) =>
         t.id === taskId ? { ...t, is_done: isDone, done_at } : t
       ),
-      // Prevent realtime jitter by locking this ID
       pendingSync: new Set(state.pendingSync).add(taskId)
     }));
-
-    // 2. Sync with database
-    await supabase
-      .from('tasks')
-      .update({ is_done: isDone, done_at })
-      .eq('id', taskId);
-
-    // 3. Unlock after delay
+    await supabase.from('tasks').update({ is_done: isDone, done_at }).eq('id', taskId);
     setTimeout(() => {
       set((state) => {
         const next = new Set(state.pendingSync);
         next.delete(taskId);
         return { pendingSync: next };
       });
-    }, 1500);
+    }, 1000);
   },
   makeRecurring: async (taskId, is_recurring) => {
     set((state) => ({
@@ -113,10 +102,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
   addTask: async (title, ownerId) => {
     const today = new Date().toISOString().split('T')[0];
-    const tempId = Math.random().toString(36).substring(7);
+    const realId = uuidv4(); // Generate real UUID on client
     
     const newTask: Task = {
-      id: tempId,
+      id: realId,
       owner_id: ownerId,
       title,
       date: today,
@@ -128,29 +117,20 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
     set((state) => ({ 
       tasks: [...state.tasks, newTask],
-      pendingSync: new Set(state.pendingSync).add(tempId)
+      pendingSync: new Set(state.pendingSync).add(realId)
     }));
 
-    const { data } = await supabase
+    await supabase
       .from('tasks')
-      .insert({ title, owner_id: ownerId, date: today, is_done: false })
-      .select()
-      .single();
-
-    if (data) {
-      set((state) => ({
-        tasks: state.tasks.map(t => t.id === tempId ? data : t)
-      }));
-    }
+      .insert({ id: realId, title, owner_id: ownerId, date: today, is_done: false });
 
     setTimeout(() => {
       set((state) => {
         const next = new Set(state.pendingSync);
-        next.delete(tempId);
-        if (data) next.delete(data.id);
+        next.delete(realId);
         return { pendingSync: next };
       });
-    }, 1500);
+    }, 1000);
   },
   deleteTask: async (taskId) => {
     set((state) => ({ tasks: state.tasks.filter(t => t.id !== taskId) }));
@@ -166,11 +146,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         (payload) => {
           const newTask = payload.new as Task;
           const oldTask = payload.old as { id: string };
-          
-          // SENIOR FIX: If we are currently syncing this task, IGNORE the database update
-          // This stops the "flickering" or "jittering" when you click fast.
           if (get().pendingSync.has(newTask?.id || oldTask?.id)) return;
-
           if (payload.eventType === 'INSERT') {
              if (newTask.owner_id === userId || newTask.owner_id === pairUserId) {
                 set((state) => {
