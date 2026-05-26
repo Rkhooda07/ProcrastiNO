@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Dimensions, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useRouter } from 'expo-router';
 import { useUserStore } from '../../store/userStore';
@@ -7,11 +7,13 @@ import { useTaskStore } from '../../store/taskStore';
 import { colors } from '../../constants/colors';
 import { supabase } from '../../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
 const calculateStreak = (dates: string[]) => {
-  if (dates.length === 0) return 0;
+  if (!dates || dates.length === 0) return 0;
   const sorted = [...new Set(dates)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
   
   const today = new Date();
@@ -43,7 +45,7 @@ const calculateStreak = (dates: string[]) => {
 };
 
 export default function ProfileScreen() {
-  const { currentUserId, partnerId, currentUserName, partnerName } = useUserStore();
+  const { currentUserId, partnerId, currentUserName, partnerName, profilePics, setProfilePic } = useUserStore();
   const { tasks, completedDates, fetchStreakData } = useTaskStore();
   const [partnerCompletedDates, setPartnerCompletedDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +82,20 @@ export default function ProfileScreen() {
     setLoading(false);
   }
 
+  const pickImage = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled && currentUserId) {
+      setProfilePic(currentUserId, result.assets[0].uri);
+    }
+  };
+
   const myTasksToday = tasks.filter(t => t.owner_id === currentUserId);
   const myCompletedToday = myTasksToday.filter(t => t.is_done).length;
   const myProgress = myTasksToday.length > 0 ? myCompletedToday / myTasksToday.length : 0;
@@ -91,6 +107,9 @@ export default function ProfileScreen() {
   const myStreak = calculateStreak(completedDates);
   const partnerStreak = calculateStreak(partnerCompletedDates);
 
+  const myPfp = currentUserId ? profilePics[currentUserId] : null;
+  const partnerPfp = partnerId ? profilePics[partnerId] : null;
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -100,12 +119,25 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
-          <View style={[styles.avatarPlaceholder, { backgroundColor: currentUserName === 'Rakshit' ? colors.accent : '#FFB7B2' }]}>
-            <Text style={styles.avatarText}>{currentUserName?.charAt(0)}</Text>
-          </View>
+          <Pressable onPress={pickImage} style={styles.pfpContainer}>
+            <View style={[styles.avatarPlaceholder, { backgroundColor: currentUserName === 'Rakshit' ? colors.accent : '#FFB7B2' }]}>
+              {myPfp ? (
+                <Image source={{ uri: myPfp }} style={styles.pfpImage} />
+              ) : (
+                <Text style={styles.avatarText}>{currentUserName?.charAt(0)}</Text>
+              )}
+            </View>
+            <View style={styles.editBadge}>
+              <Ionicons name="camera" size={14} color="#FFF" />
+            </View>
+          </Pressable>
           <Text style={styles.userName}>{currentUserName}</Text>
           <View style={styles.streakBadge}>
             <Ionicons name="flame" size={20} color={colors.streakOrange} />
@@ -129,7 +161,11 @@ export default function ProfileScreen() {
           <View style={[styles.card, styles.partnerCard]}>
             <View style={styles.partnerInfo}>
               <View style={[styles.partnerAvatar, { backgroundColor: partnerName === 'Sneh' ? '#FFB7B2' : colors.accent }]}>
-                <Text style={styles.partnerAvatarText}>{partnerName?.charAt(0)}</Text>
+                {partnerPfp ? (
+                   <Image source={{ uri: partnerPfp }} style={styles.partnerPfpImage} />
+                ) : (
+                  <Text style={styles.partnerAvatarText}>{partnerName?.charAt(0)}</Text>
+                )}
               </View>
               <View>
                 <Text style={styles.partnerName}>{partnerName}</Text>
@@ -183,6 +219,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  scrollView: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -190,26 +229,54 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 24,
+    paddingBottom: 132,
+    flexGrow: 1,
   },
   header: {
     alignItems: 'center',
     marginBottom: 32,
   },
+  pfpContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
   avatarPlaceholder: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 4,
+    overflow: 'hidden',
+  },
+  pfpImage: {
+    width: '100%',
+    height: '100%',
+  },
+  partnerPfpImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.accent,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 3,
+    borderColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarText: {
-    fontSize: 40,
+    fontSize: 44,
     fontWeight: '700',
     color: '#FFF',
   },
@@ -239,15 +306,15 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     padding: 24,
-    borderRadius: 28,
+    borderRadius: 32,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 10,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 3,
   },
   cardTitle: {
     fontSize: 18,
@@ -310,6 +377,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
+    overflow: 'hidden',
   },
   partnerAvatarText: {
     color: '#FFF',
@@ -360,6 +428,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 10,
+    elevation: 1,
   },
   menuItem: {
     flexDirection: 'row',

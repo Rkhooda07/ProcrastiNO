@@ -36,7 +36,7 @@ const PremiumTabButton = memo(function PremiumTabButton({
 }: PremiumTabButtonProps) {
   const focused = Boolean(accessibilityState?.selected);
   const activeScale = useRef(new Animated.Value(focused ? 1 : 0.94)).current;
-  const activeLift = useRef(new Animated.Value(focused ? -4 : 0)).current;
+  const activeLift = useRef(new Animated.Value(focused ? -2 : 0)).current;
   const activeGlow = useRef(new Animated.Value(focused ? 1 : 0)).current;
   const pressScale = useRef(new Animated.Value(1)).current;
 
@@ -49,7 +49,7 @@ const PremiumTabButton = memo(function PremiumTabButton({
         bounciness: 7,
       }),
       Animated.spring(activeLift, {
-        toValue: focused ? -4 : 0,
+        toValue: focused ? -2 : 0,
         useNativeDriver: true,
         speed: 22,
         bounciness: 6,
@@ -85,6 +85,7 @@ const PremiumTabButton = memo(function PremiumTabButton({
   return (
     <Pressable
       {...props}
+      android_ripple={null}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       style={(state: PressableStateCallbackType) => [
@@ -120,21 +121,21 @@ const PremiumTabButton = memo(function PremiumTabButton({
             },
           ]}
         />
-        <Animated.View
-          style={[
-            styles.tabButtonInner,
-            {
-              transform: [{ scale: pressScale }],
-              borderColor: focused ? `${accentColor}26` : 'transparent',
-              backgroundColor: focused ? '#FFFFFF' : 'rgba(255,255,255,0.72)',
-            },
-          ]}
-        >
+          <Animated.View
+            style={[
+              styles.tabButtonInner,
+              {
+                transform: [{ scale: pressScale }],
+                borderColor: focused ? `${accentColor}33` : 'rgba(165, 149, 122, 0.12)',
+                backgroundColor: focused ? 'rgba(255,253,248,0.82)' : 'rgba(255,248,238,0.64)',
+              },
+            ]}
+          >
           <View
             style={[
               styles.tabIconPlate,
               {
-                backgroundColor: focused ? `${accentColor}18` : 'rgba(255,255,255,0.5)',
+                backgroundColor: focused ? `${accentColor}20` : 'rgba(255,252,246,0.72)',
               },
             ]}
           >
@@ -177,20 +178,22 @@ export default function TabLayout() {
         tabBarHideOnKeyboard: true,
         tabBarStyle: {
           position: 'absolute',
-          height: Platform.OS === 'ios' ? 92 : 74,
-          paddingTop: 10,
-          paddingBottom: Platform.OS === 'ios' ? 30 : 12,
+          height: Platform.OS === 'ios' ? 104 : 84,
+          paddingTop: 0,
+          paddingBottom: 0,
           backgroundColor: 'transparent',
           borderTopWidth: 0,
           elevation: 0,
         },
         tabBarItemStyle: {
           paddingHorizontal: 6,
+          justifyContent: 'center',
+          alignItems: 'center',
         },
         tabBarBackground: () => (
           <View style={styles.tabBarBackground}>
             <BlurView
-              intensity={Platform.OS === 'ios' ? 70 : 90}
+              intensity={Platform.OS === 'ios' ? 48 : 64}
               tint="light"
               blurMethod={Platform.OS === 'android' ? 'dimezisBlurViewSdk31Plus' : undefined}
               style={StyleSheet.absoluteFill}
@@ -273,43 +276,46 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBarBackground: {
     flex: 1,
-    marginHorizontal: 18,
-    marginBottom: Platform.OS === 'ios' ? 18 : 10,
-    borderRadius: 28,
+    marginHorizontal: 16,
+    marginTop: Platform.OS === 'ios' ? 16 : 12,
+    marginBottom: Platform.OS === 'ios' ? 12 : 10,
+    borderRadius: 30,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.7)',
-    shadowColor: '#8C8A80',
+    borderColor: 'rgba(255, 250, 240, 0.68)',
+    shadowColor: '#9B8A6B',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 12,
+    shadowOpacity: 0.18,
+    shadowRadius: 22,
+    elevation: 14,
   },
   tabBarOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(255,255,255,0.55)',
+    backgroundColor: 'rgba(250,242,230,0.38)',
   },
   tabPressable: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: 17,
+    paddingBottom: 0,
   },
   tabButtonOuter: {
-    width: 64,
-    height: 54,
+    width: 62,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabActiveHalo: {
     position: 'absolute',
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
   },
   tabButtonInner: {
-    width: 56,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -323,8 +329,8 @@ const styles = StyleSheet.create({
   },
   tabIndicator: {
     position: 'absolute',
-    bottom: 7,
-    width: 18,
+    bottom: 5,
+    width: 16,
     height: 3,
     borderRadius: 999,
   },
