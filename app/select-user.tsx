@@ -228,9 +228,7 @@ export default function UserSelection() {
           <View style={styles.logoWrap}>
             <Image source={LOGO} style={styles.logo} resizeMode="contain" />
           </View>
-          <Text style={styles.eyebrow}>Shared Focus</Text>
-          <Text style={styles.title}>Choose your space</Text>
-          <Text style={styles.description}>
+          <Text style={styles.title}>
             Pick your profile to jump straight into today&apos;s tasks.
           </Text>
         </Animated.View>
@@ -359,26 +357,13 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
   },
-  eyebrow: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    color: colors.textSecondary,
-    marginBottom: 10,
-  },
   title: {
-    fontSize: 34,
+    fontSize: 30,
     fontWeight: '800',
-    letterSpacing: -1.2,
+    letterSpacing: -0.8,
     color: colors.textPrimary,
-    marginBottom: 10,
-  },
-  description: {
-    fontSize: 16,
-    lineHeight: 24,
+    lineHeight: 40,
     textAlign: 'center',
-    color: colors.textSecondary,
     maxWidth: 320,
   },
   profileContainer: {
