@@ -36,6 +36,13 @@
       ],
       "expo-web-browser",
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5b141815-db11-4070-bdc5-ac7802d5317e"
+      }
+    },
+    "owner": "rkhooda7"
   }
 }
