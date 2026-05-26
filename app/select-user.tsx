@@ -5,7 +5,7 @@ import { useUserStore, RAKSHIT_ID, SNEH_ID } from '../store/userStore';
 import { colors } from '../constants/colors';
 
 export default function UserSelection() {
-  const { setUser } = useUserStore();
+  const { setUser, profilePics } = useUserStore();
   const router = useRouter();
 
   const handleSelect = async (id: string) => {
@@ -24,7 +24,11 @@ export default function UserSelection() {
             onPress={() => handleSelect(RAKSHIT_ID)}
           >
             <View style={[styles.avatarBox, { backgroundColor: '#A89AE6' }]}>
-              <Text style={styles.avatarLetter}>R</Text>
+              {profilePics[RAKSHIT_ID] ? (
+                <Image source={{ uri: profilePics[RAKSHIT_ID] }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarLetter}>R</Text>
+              )}
             </View>
             <Text style={styles.name}>Rakshit</Text>
           </Pressable>
@@ -34,7 +38,11 @@ export default function UserSelection() {
             onPress={() => handleSelect(SNEH_ID)}
           >
             <View style={[styles.avatarBox, { backgroundColor: '#FFB7B2' }]}>
-              <Text style={styles.avatarLetter}>S</Text>
+              {profilePics[SNEH_ID] ? (
+                <Image source={{ uri: profilePics[SNEH_ID] }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarLetter}>S</Text>
+              )}
             </View>
             <Text style={styles.name}>Sneh</Text>
           </Pressable>
@@ -86,6 +94,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarLetter: {
     fontSize: 48,
