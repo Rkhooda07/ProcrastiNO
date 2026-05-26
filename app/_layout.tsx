@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
-import * as Notifications from 'expo-notifications';
 import { Slot, useRouter, useSegments } from 'expo-router';
-import { Platform } from 'react-native';
 import { useUserStore } from '../store/userStore';
 import { StatusBar } from 'expo-status-bar';
-import { ensureNotificationsReadyAsync } from '../lib/notifications';
+import {
+  addNotificationResponseListener,
+  ensureNotificationsReadyAsync,
+  getLastNotificationResponseAsync,
+} from '../lib/notifications';
 import { useReminderStore } from '../store/reminderStore';
 
 export default function RootLayout() {
@@ -45,26 +47,35 @@ export default function RootLayout() {
   }, [currentUserId, fetchReminderSettings]);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return;
-
-    const redirectFromNotification = (notification: Notifications.Notification) => {
-      const url = notification.request.content.data?.url;
+    const redirectFromNotification = (notification: any) => {
+      const url = notification?.request?.content?.data?.url;
       if (typeof url === 'string') {
         router.push(url as '/tasks');
       }
     };
 
-    const response = Notifications.getLastNotificationResponse();
-    if (response?.notification) {
-      redirectFromNotification(response.notification);
-    }
+    void getLastNotificationResponseAsync().then((response) => {
+      if (response?.notification) {
+        redirectFromNotification(response.notification);
+      }
+    });
 
-    const subscription = Notifications.addNotificationResponseReceivedListener((nextResponse) => {
-      redirectFromNotification(nextResponse.notification);
+    let active = true;
+    let subscription: { remove: () => void } | null = null;
+
+    void addNotificationResponseListener((nextResponse) => {
+      redirectFromNotification(nextResponse?.notification);
+    }).then((nextSubscription) => {
+      if (!active) {
+        nextSubscription.remove();
+        return;
+      }
+      subscription = nextSubscription;
     });
 
     return () => {
-      subscription.remove();
+      active = false;
+      subscription?.remove();
     };
   }, [router]);
 

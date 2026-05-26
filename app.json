@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "procrastino",
+    "name": "ProcrastiNO",
     "slug": "procrastino",
     "version": "1.0.0",
     "scheme": "procrastino",
@@ -8,13 +8,17 @@
     "icon": "./assets/Logo.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rkhooda.procrastino"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#F7EEDF",
-        "foregroundImage": "./assets/Logo.png"
+        "backgroundImage": "./assets/android-icon-background.png",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "package": "com.rkhooda.procrastino",
+      "versionCode": 1,
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -22,7 +26,14 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#A89AE6",
+          "defaultChannel": "general"
+        }
+      ],
       "expo-web-browser",
       "expo-status-bar"
     ]

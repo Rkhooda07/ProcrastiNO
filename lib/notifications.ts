@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 type ReminderSettingsInput = {
@@ -26,14 +26,38 @@ const WELLNESS_NOTIFICATION_KEY = 'scheduled-wellness-notifications';
 const TASK_NOTIFICATION_KEY = 'scheduled-task-notifications';
 const TASK_REMINDER_URL = '/tasks';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+let notificationsModulePromise: Promise<any | null> | null = null;
+
+function isExpoGo() {
+  return Constants.appOwnership === 'expo';
+}
+
+async function getNotificationsModule() {
+  if (Platform.OS === 'web' || isExpoGo()) {
+    return null;
+  }
+
+  if (!notificationsModulePromise) {
+    notificationsModulePromise = import('expo-notifications')
+      .then((module) => {
+        module.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowBanner: true,
+            shouldShowList: true,
+            shouldPlaySound: true,
+            shouldSetBadge: false,
+          }),
+        });
+        return module;
+      })
+      .catch((error) => {
+        console.warn('Failed to load notifications module', error);
+        return null;
+      });
+  }
+
+  return notificationsModulePromise;
+}
 
 function todayString() {
   return new Date().toISOString().split('T')[0];
@@ -62,13 +86,18 @@ async function readScheduledIds(key: string) {
 }
 
 async function cancelScheduledGroup(key: string) {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return;
+
   const ids = await readScheduledIds(key);
   await Promise.all(ids.map((id) => Notifications.cancelScheduledNotificationAsync(id).catch(() => null)));
   await AsyncStorage.removeItem(key);
 }
 
 async function configureChannelsAsync() {
+  const Notifications = await getNotificationsModule();
   if (Platform.OS !== 'android') return;
+  if (!Notifications) return;
 
   await Notifications.setNotificationChannelAsync(WELLNESS_CHANNEL_ID, {
     name: 'Wellness reminders',
@@ -86,7 +115,8 @@ async function configureChannelsAsync() {
 }
 
 export async function ensureNotificationsReadyAsync() {
-  if (Platform.OS === 'web') {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) {
     return false;
   }
 
@@ -104,7 +134,8 @@ export async function ensureNotificationsReadyAsync() {
 export async function scheduleWellnessNotificationsAsync(
   settings: ReminderSettingsInput | null
 ) {
-  if (Platform.OS === 'web') return;
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return;
 
   await cancelScheduledGroup(WELLNESS_NOTIFICATION_KEY);
 
@@ -158,7 +189,8 @@ export async function scheduleTaskReminderNotificationsAsync({
   ownerName,
   tasks,
 }: TaskReminderInput) {
-  if (Platform.OS === 'web') return;
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return;
 
   await cancelScheduledGroup(TASK_NOTIFICATION_KEY);
 
@@ -217,4 +249,21 @@ export async function scheduleTaskReminderNotificationsAsync({
   }
 
   await saveScheduledIds(TASK_NOTIFICATION_KEY, ids);
+}
+
+export async function getLastNotificationResponseAsync() {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return null;
+  return Notifications.getLastNotificationResponseAsync();
+}
+
+export async function addNotificationResponseListener(
+  listener: (response: any) => void
+) {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) {
+    return { remove() {} };
+  }
+
+  return Notifications.addNotificationResponseReceivedListener(listener);
 }
