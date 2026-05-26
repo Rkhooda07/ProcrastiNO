@@ -12,9 +12,11 @@ interface UserState {
   currentUserName: string | null;
   partnerId: string | null;
   partnerName: string | null;
+  profilePics: Record<string, string>; // { [userId]: uri }
   hasChosenUser: boolean;
   _hasHydrated: boolean;
   setUser: (id: string) => Promise<void>;
+  setProfilePic: (userId: string, uri: string) => void;
   resetUser: () => void;
   setHasHydrated: (state: boolean) => void;
 }
@@ -26,6 +28,7 @@ export const useUserStore = create<UserState>()(
       currentUserName: null,
       partnerId: null,
       partnerName: null,
+      profilePics: {},
       hasChosenUser: false,
       _hasHydrated: false,
       setUser: async (id: string) => {
@@ -33,10 +36,6 @@ export const useUserStore = create<UserState>()(
         const currentUserName = isRakshit ? 'Rakshit' : 'Sneh';
         const partnerId = isRakshit ? SNEH_ID : RAKSHIT_ID;
         const partnerName = isRakshit ? 'Sneh' : 'Rakshit';
-        
-        // Seed stats if they don't exist
-        await supabase.from('user_stats').upsert({ user_id: id }, { onConflict: 'user_id' });
-        await supabase.from('user_stats').upsert({ user_id: partnerId }, { onConflict: 'user_id' });
 
         set({ 
           currentUserId: id, 
@@ -45,6 +44,19 @@ export const useUserStore = create<UserState>()(
           partnerName, 
           hasChosenUser: true 
         });
+
+        // Seed stats in the background so profile selection feels instant.
+        void Promise.all([
+          supabase.from('user_stats').upsert({ user_id: id }, { onConflict: 'user_id' }),
+          supabase.from('user_stats').upsert({ user_id: partnerId }, { onConflict: 'user_id' }),
+        ]).catch((error) => {
+          console.warn('Failed to seed user stats', error);
+        });
+      },
+      setProfilePic: (userId, uri) => {
+        set((state) => ({
+          profilePics: { ...state.profilePics, [userId]: uri }
+        }));
       },
       resetUser: () => {
         set({ 
