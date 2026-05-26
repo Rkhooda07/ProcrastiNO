@@ -15,17 +15,22 @@ export interface Task {
 interface TaskState {
   tasks: Task[];
   isLoading: boolean;
+  completedDates: string[]; 
+  pendingSync: Set<string>; // Track tasks currently syncing to DB
   fetchTasks: (userId: string, pairUserId: string | null) => Promise<void>;
   toggleTask: (taskId: string, isDone: boolean) => Promise<void>;
   addTask: (title: string, ownerId: string) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
   makeRecurring: (taskId: string, recurring: boolean) => Promise<void>;
+  fetchStreakData: (userId: string) => Promise<void>;
   subscribeToTasks: (userId: string, pairUserId: string | null) => () => void;
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
   tasks: [],
   isLoading: false,
+  completedDates: [],
+  pendingSync: new Set(),
   fetchTasks: async (userId, pairUserId) => {
     set({ isLoading: true });
     const today = new Date().toISOString().split('T')[0];
@@ -47,35 +52,64 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     } else {
       set({ isLoading: false });
     }
+    
+    get().fetchStreakData(userId);
+  },
+  fetchStreakData: async (userId) => {
+    const { data } = await supabase
+      .from('tasks')
+      .select('date, is_done')
+      .eq('owner_id', userId);
+
+    if (data) {
+      const datesGrouped: { [key: string]: { total: number, done: number } } = {};
+      data.forEach(t => {
+        if (!datesGrouped[t.date]) datesGrouped[t.date] = { total: 0, done: 0 };
+        datesGrouped[t.date].total++;
+        if (t.is_done) datesGrouped[t.date].done++;
+      });
+
+      const completed = Object.keys(datesGrouped).filter(d => 
+        datesGrouped[d].total > 0 && datesGrouped[d].total === datesGrouped[d].done
+      );
+      
+      set({ completedDates: completed });
+    }
   },
   toggleTask: async (taskId, isDone) => {
     const done_at = isDone ? new Date().toISOString() : null;
-    const { error } = await supabase
+    
+    // 1. Instant UI update (Optimistic)
+    set((state) => ({
+      tasks: state.tasks.map((t) =>
+        t.id === taskId ? { ...t, is_done: isDone, done_at } : t
+      ),
+      // Prevent realtime jitter by locking this ID
+      pendingSync: new Set(state.pendingSync).add(taskId)
+    }));
+
+    // 2. Sync with database
+    await supabase
       .from('tasks')
       .update({ is_done: isDone, done_at })
       .eq('id', taskId);
 
-    if (!error) {
-      set((state) => ({
-        tasks: state.tasks.map((t) =>
-          t.id === taskId ? { ...t, is_done: isDone, done_at } : t
-        ),
-      }));
-    }
+    // 3. Unlock after delay
+    setTimeout(() => {
+      set((state) => {
+        const next = new Set(state.pendingSync);
+        next.delete(taskId);
+        return { pendingSync: next };
+      });
+    }, 1500);
   },
   makeRecurring: async (taskId, is_recurring) => {
-    const { error } = await supabase
-      .from('tasks')
-      .update({ is_recurring })
-      .eq('id', taskId);
-
-    if (!error) {
-      set((state) => ({
-        tasks: state.tasks.map((t) =>
-          t.id === taskId ? { ...t, is_recurring } : t
-        ),
-      }));
-    }
+    set((state) => ({
+      tasks: state.tasks.map((t) =>
+        t.id === taskId ? { ...t, is_recurring } : t
+      ),
+    }));
+    await supabase.from('tasks').update({ is_recurring }).eq('id', taskId);
   },
   addTask: async (title, ownerId) => {
     const today = new Date().toISOString().split('T')[0];
@@ -92,67 +126,54 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       created_at: new Date().toISOString()
     };
 
-    // Optimistically add to state
-    set((state) => ({ tasks: [...state.tasks, newTask] }));
+    set((state) => ({ 
+      tasks: [...state.tasks, newTask],
+      pendingSync: new Set(state.pendingSync).add(tempId)
+    }));
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('tasks')
       .insert({ title, owner_id: ownerId, date: today, is_done: false })
       .select()
       .single();
 
-    if (error) {
-      console.error('Error adding task:', error);
-      // Rollback on error
-      set((state) => ({ tasks: state.tasks.filter(t => t.id !== tempId) }));
-    } else if (data) {
-      // Replace temp task with real one from DB, but only if listener hasn't added it yet
-      set((state) => {
-        const alreadyAddedByListener = state.tasks.some(t => t.id === data.id);
-        if (alreadyAddedByListener) {
-          return { tasks: state.tasks.filter(t => t.id !== tempId) };
-        }
-        return {
-          tasks: state.tasks.map(t => t.id === tempId ? data : t)
-        };
-      });
+    if (data) {
+      set((state) => ({
+        tasks: state.tasks.map(t => t.id === tempId ? data : t)
+      }));
     }
+
+    setTimeout(() => {
+      set((state) => {
+        const next = new Set(state.pendingSync);
+        next.delete(tempId);
+        if (data) next.delete(data.id);
+        return { pendingSync: next };
+      });
+    }, 1500);
   },
   deleteTask: async (taskId) => {
-    // Optimistic delete
     set((state) => ({ tasks: state.tasks.filter(t => t.id !== taskId) }));
-    
-    const { error } = await supabase
-      .from('tasks')
-      .delete()
-      .eq('id', taskId);
-
-    if (error) {
-      console.error('Error deleting task:', error);
-      // We should ideally fetch tasks again or revert, but for MVP keep it simple
-    }
+    await supabase.from('tasks').delete().eq('id', taskId);
   },
   subscribeToTasks: (userId, pairUserId) => {
     const today = new Date().toISOString().split('T')[0];
-    
     const channel = supabase
       .channel('tasks-realtime')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tasks',
-          filter: `date=eq.${today}`,
-        },
+        { event: '*', schema: 'public', table: 'tasks', filter: `date=eq.${today}` },
         (payload) => {
           const newTask = payload.new as Task;
           const oldTask = payload.old as { id: string };
+          
+          // SENIOR FIX: If we are currently syncing this task, IGNORE the database update
+          // This stops the "flickering" or "jittering" when you click fast.
+          if (get().pendingSync.has(newTask?.id || oldTask?.id)) return;
 
           if (payload.eventType === 'INSERT') {
              if (newTask.owner_id === userId || newTask.owner_id === pairUserId) {
                 set((state) => {
-                  // Prevent duplicates if already added by addTask
                   if (state.tasks.some(t => t.id === newTask.id)) return state;
                   return { tasks: [...state.tasks, newTask] };
                 });
@@ -169,9 +190,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         }
       )
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   },
 }));

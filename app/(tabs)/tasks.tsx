@@ -1,19 +1,53 @@
-import React, { useEffect, useState, useRef, memo } from 'react';
+import React, { useEffect, useState, useRef, memo, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TextInput, Pressable, KeyboardAvoidingView, Platform, Modal, Animated } from 'react-native';
-import { useUserStore } from '../../store/userStore';
+import { useUserStore, RAKSHIT_ID, SNEH_ID } from '../../store/userStore';
 import { useTaskStore, Task } from '../../store/taskStore';
 import { TaskItem } from '../../components/TaskItem';
 import { colors } from '../../constants/colors';
+import { DEFAULT_TASKS } from '../../constants/defaultTasks';
 import { Pager } from '../../components/Pager';
 import { supabase } from '../../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
+import { Calendar } from 'react-native-calendars';
+import { useNavigation } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 
-// Separate component for stability
+const calculateStreak = (dates: string[]) => {
+  if (!dates || dates.length === 0) return 0;
+  const sorted = [...new Set(dates)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const todayStr = today.toISOString().split('T')[0];
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  
+  if (sorted[0] !== todayStr && sorted[0] !== yesterdayStr) return 0;
+  
+  let streak = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const d = new Date(sorted[i]);
+    if (i === 0) {
+      streak = 1;
+    } else {
+      const prev = new Date(sorted[i-1]);
+      prev.setDate(prev.getDate() - 1);
+      if (d.toISOString().split('T')[0] === prev.toISOString().split('T')[0]) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+  }
+  return streak;
+};
+
 const TaskList = memo(({ 
   data, 
   isOwner, 
@@ -103,20 +137,54 @@ const TaskList = memo(({
 });
 
 export default function TasksScreen() {
-  const { currentUserId, partnerId, partnerName } = useUserStore();
-  const { tasks, isLoading, fetchTasks, toggleTask, addTask, deleteTask, makeRecurring, subscribeToTasks } = useTaskStore();
+  const { currentUserId, partnerId, currentUserName, partnerName } = useUserStore();
+  const { tasks, isLoading, completedDates, fetchTasks, toggleTask, addTask, deleteTask, makeRecurring, subscribeToTasks } = useTaskStore();
   const [currentPage, setCurrentPage] = useState(0);
   const [focusedTask, setFocusedTask] = useState<Task | null>(null);
+  const [showCalendar, setShowCalendar] = useState(false);
   const pagerRef = useRef<any>(null);
+  const navigation = useNavigation();
   
   const popAnim = useRef(new Animated.Value(0)).current;
+
+  const currentStreak = useMemo(() => calculateStreak(completedDates), [completedDates]);
+  
+  const markedDates = useMemo(() => {
+    return completedDates.reduce((acc: any, date) => {
+      acc[date] = { 
+        selected: true, 
+        selectedColor: colors.accentMint,
+        customStyles: { container: { borderRadius: 8 } }
+      };
+      return acc;
+    }, {});
+  }, [completedDates]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable 
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowCalendar(true);
+          }} 
+          style={{ marginRight: 20, flexDirection: 'row', alignItems: 'center', padding: 4 }}
+        >
+          <Text style={{ marginRight: 4, fontWeight: '700', color: colors.streakOrange, fontSize: 16 }}>
+            {currentStreak}
+          </Text>
+          <Ionicons name="flame" size={24} color={colors.streakOrange} />
+        </Pressable>
+      ),
+    });
+  }, [currentStreak]);
 
   useEffect(() => {
     if (focusedTask) {
       Animated.spring(popAnim, {
         toValue: 1,
         useNativeDriver: true,
-        tension: 80,
+        tension: 100,
         friction: 8
       }).start();
     } else {
@@ -208,7 +276,6 @@ export default function TasksScreen() {
         </Pager>
       </KeyboardAvoidingView>
 
-      {/* Delete Overlay with Real Glassmorphism Blur */}
       <Modal
         visible={!!focusedTask}
         transparent={true}
@@ -283,6 +350,53 @@ export default function TasksScreen() {
           </Pressable>
         </BlurView>
       </Modal>
+
+      <Modal
+        visible={showCalendar}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCalendar(false)}
+      >
+        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill}>
+          <Pressable style={styles.overlay} onPress={() => setShowCalendar(false)}>
+            <View style={styles.calendarContainer}>
+              <View style={styles.calendarHeader}>
+                <Ionicons name="flame" size={32} color={colors.streakOrange} />
+                <Text style={styles.calendarTitle}>{currentStreak} Day Streak!</Text>
+                <Text style={styles.calendarSubtitle}>Keep it up, {currentUserName}!</Text>
+              </View>
+              <Calendar
+                enableSwipeMonths={true}
+                theme={{
+                  backgroundColor: '#ffffff',
+                  calendarBackground: '#ffffff',
+                  textSectionTitleColor: '#b6c1cd',
+                  selectedDayBackgroundColor: colors.accentMint,
+                  selectedDayTextColor: '#ffffff',
+                  todayTextColor: colors.accent,
+                  dayTextColor: '#2d4150',
+                  textDisabledColor: '#d9e1e8',
+                  dotColor: colors.accentMint,
+                  selectedDotColor: '#ffffff',
+                  arrowColor: colors.accent,
+                  monthTextColor: colors.textPrimary,
+                  textDayFontWeight: '600',
+                  textMonthFontWeight: 'bold',
+                  textDayHeaderFontWeight: '500',
+                  textDayFontSize: 16,
+                  textMonthFontSize: 18,
+                  textDayHeaderFontSize: 13
+                }}
+                markedDates={markedDates}
+                style={styles.calendar}
+              />
+              <Pressable style={styles.closeBtn} onPress={() => setShowCalendar(false)}>
+                <Text style={styles.closeBtnText}>Close</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </BlurView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -350,7 +464,7 @@ const styles = StyleSheet.create({
   inlineInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14, // Matched with TaskItem
+    paddingVertical: 16,
     paddingHorizontal: 16,
     backgroundColor: colors.surface,
     borderRadius: 16,
@@ -456,5 +570,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     marginLeft: 6,
+  },
+  calendarContainer: {
+    backgroundColor: '#FFF',
+    width: width - 40,
+    borderRadius: 32,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.2,
+    shadowRadius: 40,
+    elevation: 20,
+  },
+  calendarHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  calendarTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginTop: 8,
+  },
+  calendarSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  calendar: {
+    width: width - 80,
+    borderRadius: 16,
+  },
+  closeBtn: {
+    marginTop: 24,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    backgroundColor: colors.background,
+    borderRadius: 16,
+  },
+  closeBtnText: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

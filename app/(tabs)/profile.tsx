@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useRouter } from 'expo-router';
 import { useUserStore } from '../../store/userStore';
@@ -8,37 +8,74 @@ import { colors } from '../../constants/colors';
 import { supabase } from '../../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+const { width } = Dimensions.get('window');
+
+const calculateStreak = (dates: string[]) => {
+  if (dates.length === 0) return 0;
+  const sorted = [...new Set(dates)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const todayStr = today.toISOString().split('T')[0];
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  
+  if (sorted[0] !== todayStr && sorted[0] !== yesterdayStr) return 0;
+  
+  let streak = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const d = new Date(sorted[i]);
+    if (i === 0) {
+      streak = 1;
+    } else {
+      const prev = new Date(sorted[i-1]);
+      prev.setDate(prev.getDate() - 1);
+      if (d.toISOString().split('T')[0] === prev.toISOString().split('T')[0]) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+  }
+  return streak;
+};
+
 export default function ProfileScreen() {
-  const { currentUserId, partnerId } = useUserStore();
-  const { tasks } = useTaskStore();
-  const [stats, setStats] = useState<any>(null);
-  const [partnerStats, setPartnerStats] = useState<any>(null);
+  const { currentUserId, partnerId, currentUserName, partnerName } = useUserStore();
+  const { tasks, completedDates, fetchStreakData } = useTaskStore();
+  const [partnerCompletedDates, setPartnerCompletedDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     if (currentUserId) {
-      fetchStats();
+      loadData();
     }
   }, [currentUserId, partnerId]);
 
-  async function fetchStats() {
+  async function loadData() {
     setLoading(true);
-    const { data: myStats } = await supabase
-      .from('user_stats')
-      .select('*')
-      .eq('user_id', currentUserId)
-      .single();
-
-    if (myStats) setStats(myStats);
-
+    await fetchStreakData(currentUserId!);
     if (partnerId) {
-      const { data: pStats } = await supabase
-        .from('user_stats')
-        .select('*')
-        .eq('user_id', partnerId)
-        .single();
-      if (pStats) setPartnerStats(pStats);
+      const { data } = await supabase
+        .from('tasks')
+        .select('date, is_done')
+        .eq('owner_id', partnerId);
+
+      if (data) {
+        const datesGrouped: { [key: string]: { total: number, done: number } } = {};
+        data.forEach(t => {
+          if (!datesGrouped[t.date]) datesGrouped[t.date] = { total: 0, done: 0 };
+          datesGrouped[t.date].total++;
+          if (t.is_done) datesGrouped[t.date].done++;
+        });
+        const completed = Object.keys(datesGrouped).filter(d => 
+          datesGrouped[d].total > 0 && datesGrouped[d].total === datesGrouped[d].done
+        );
+        setPartnerCompletedDates(completed);
+      }
     }
     setLoading(false);
   }
@@ -49,6 +86,10 @@ export default function ProfileScreen() {
 
   const partnerTasksToday = tasks.filter(t => t.owner_id === partnerId);
   const partnerCompletedToday = partnerTasksToday.filter(t => t.is_done).length;
+  const partnerProgress = partnerTasksToday.length > 0 ? partnerCompletedToday / partnerTasksToday.length : 0;
+
+  const myStreak = calculateStreak(completedDates);
+  const partnerStreak = calculateStreak(partnerCompletedDates);
 
   if (loading) {
     return (
@@ -62,19 +103,22 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarText}>P</Text>
+          <View style={[styles.avatarPlaceholder, { backgroundColor: currentUserName === 'Rakshit' ? colors.accent : '#FFB7B2' }]}>
+            <Text style={styles.avatarText}>{currentUserName?.charAt(0)}</Text>
           </View>
-          <Text style={styles.userName}>{currentUserId === 'user-alpha-unique-id' ? 'User 1' : 'User 2'}</Text>
+          <Text style={styles.userName}>{currentUserName}</Text>
           <View style={styles.streakBadge}>
             <Ionicons name="flame" size={20} color={colors.streakOrange} />
-            <Text style={styles.streakText}>{stats?.streak_count || 0}-day streak</Text>
+            <Text style={styles.streakText}>{myStreak}-day streak</Text>
           </View>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Today's Progress</Text>
-          <Text style={styles.progressText}>{myCompletedToday}/{myTasksToday.length} tasks done</Text>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressText}>{myCompletedToday}/{myTasksToday.length} tasks done</Text>
+            <Text style={styles.percentageText}>{Math.round(myProgress * 100)}%</Text>
+          </View>
           <View style={styles.progressBarBg}>
             <View style={[styles.progressBarFill, { width: `${myProgress * 100}%` }]} />
           </View>
@@ -84,16 +128,22 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Partner's Status</Text>
           <View style={[styles.card, styles.partnerCard]}>
             <View style={styles.partnerInfo}>
-              <View style={styles.partnerAvatar}>
-                <Ionicons name="person" size={20} color={colors.accent} />
+              <View style={[styles.partnerAvatar, { backgroundColor: partnerName === 'Sneh' ? '#FFB7B2' : colors.accent }]}>
+                <Text style={styles.partnerAvatarText}>{partnerName?.charAt(0)}</Text>
               </View>
               <View>
-                <Text style={styles.partnerName}>Your Partner</Text>
-                <Text style={styles.partnerStreak}>{partnerStats?.streak_count || 0}-day streak</Text>
+                <Text style={styles.partnerName}>{partnerName}</Text>
+                <View style={styles.partnerStreakRow}>
+                  <Ionicons name="flame" size={14} color={colors.streakOrange} />
+                  <Text style={styles.partnerStreak}>{partnerStreak}-day streak</Text>
+                </View>
               </View>
             </View>
-            <View style={styles.partnerProgress}>
-               <Text style={styles.partnerProgressText}>{partnerCompletedToday}/{partnerTasksToday.length} today</Text>
+            <View style={styles.partnerProgressContainer}>
+               <Text style={styles.partnerProgressText}>{partnerCompletedToday}/{partnerTasksToday.length} done</Text>
+               <View style={styles.miniProgressBg}>
+                 <View style={[styles.miniProgressFill, { width: `${partnerProgress * 100}%` }]} />
+               </View>
             </View>
           </View>
         </View>
@@ -122,7 +172,7 @@ export default function ProfileScreen() {
               <Text style={[styles.menuItemText, { color: colors.accent }]}>Switch Profile</Text>
             </View>
           </Pressable>
-          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -139,127 +189,170 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrollContent: {
-    padding: 20,
+    padding: 24,
   },
   header: {
     alignItems: 'center',
     marginBottom: 32,
-    marginTop: 20,
   },
   avatarPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.accent,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
   avatarText: {
-    fontSize: 32,
+    fontSize: 40,
     fontWeight: '700',
     color: '#FFF',
   },
   userName: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: 8,
+    marginBottom: 10,
+    letterSpacing: -0.5,
   },
   streakBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFBEB',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#FEF3C7',
   },
   streakText: {
-    marginLeft: 6,
-    fontSize: 14,
-    fontWeight: '600',
+    marginLeft: 8,
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.streakOrange,
   },
   card: {
     backgroundColor: colors.surface,
-    padding: 20,
-    borderRadius: 24,
+    padding: 24,
+    borderRadius: 28,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.textPrimary,
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  progressText: {
-    fontSize: 14,
-    color: colors.textSecondary,
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
+  progressText: {
+    fontSize: 15,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  percentageText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.accentMint,
+  },
   progressBarBg: {
-    height: 8,
+    height: 12,
     backgroundColor: colors.background,
-    borderRadius: 4,
+    borderRadius: 6,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: colors.accentMint,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   section: {
     marginBottom: 32,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.textPrimary,
     marginBottom: 16,
     marginLeft: 4,
+    letterSpacing: -0.3,
   },
   partnerCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    padding: 20,
   },
   partnerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   partnerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.background,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 14,
+  },
+  partnerAvatarText: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: '700',
   },
   partnerName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     color: colors.textPrimary,
   },
-  partnerStreak: {
-    fontSize: 12,
-    color: colors.streakOrange,
-    fontWeight: '500',
+  partnerStreakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
   },
-  partnerProgress: {
-    backgroundColor: colors.background,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+  partnerStreak: {
+    fontSize: 13,
+    color: colors.streakOrange,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  partnerProgressContainer: {
+    alignItems: 'flex-end',
+    width: 100,
   },
   partnerProgressText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.textSecondary,
+    marginBottom: 6,
+  },
+  miniProgressBg: {
+    width: '100%',
+    height: 6,
+    backgroundColor: colors.background,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  miniProgressFill: {
+    height: '100%',
+    backgroundColor: colors.accentMint,
+    borderRadius: 3,
   },
   menu: {
     backgroundColor: colors.surface,
@@ -272,7 +365,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
@@ -281,9 +374,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   menuItemText: {
-    marginLeft: 12,
+    marginLeft: 14,
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
 });
