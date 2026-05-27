@@ -38,8 +38,9 @@ async function getNotificationsModule() {
   }
 
   if (!notificationsModulePromise) {
-    notificationsModulePromise = import('expo-notifications')
-      .then((module) => {
+    notificationsModulePromise = Promise.resolve()
+      .then(() => {
+        const module = require('expo-notifications');
         module.setNotificationHandler({
           handleNotification: async () => ({
             shouldShowBanner: true,
