@@ -250,6 +250,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="workout"
+        options={{
+          title: 'Workout',
+          tabBarButton: (props) => (
+            <PremiumTabButton
+              {...props}
+              activeIcon="fitness"
+              inactiveIcon="fitness-outline"
+              accentColor="#7C4DFF"
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
