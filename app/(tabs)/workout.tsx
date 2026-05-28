@@ -23,6 +23,19 @@ interface Workout {
 
 const WORKOUTS: Workout[] = [
   {
+    id: '4',
+    title: 'Core Shredder',
+    description: 'Targeted core exercises for weight loss and abdominal definition.',
+    duration: '30 min',
+    image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=600&auto=format&fit=crop',
+    exercises: [
+      { name: 'Crunches', duration: 45, image: 'https://images.unsplash.com/photo-1594911772125-07fc7a2d8d9f?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Leg Raises', duration: 45, image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Plank Jacks', duration: 45, image: 'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Russian Twists', duration: 45, image: 'https://images.unsplash.com/photo-1599058917233-358368395ff6?q=80&w=400&auto=format&fit=crop' },
+    ]
+  },
+  {
     id: '1',
     title: 'Cardio Blast',
     description: 'High-intensity cardio to get your heart racing and burn calories fast.',
@@ -59,19 +72,6 @@ const WORKOUTS: Workout[] = [
       { name: 'Dips', duration: 30, image: 'https://images.unsplash.com/photo-1591948970421-14b98694671c?q=80&w=400&auto=format&fit=crop' },
       { name: 'Chin Ups', duration: 30, image: 'https://images.unsplash.com/photo-1594911772125-07fc7a2d8d9f?q=80&w=400&auto=format&fit=crop' },
       { name: 'Pushups', duration: 45, image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=400&auto=format&fit=crop' },
-    ]
-  },
-  {
-    id: '4',
-    title: 'Core Shredder',
-    description: 'Targeted core exercises for weight loss and abdominal definition.',
-    duration: '30 min',
-    image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=600&auto=format&fit=crop',
-    exercises: [
-      { name: 'Crunches', duration: 45, image: 'https://images.unsplash.com/photo-1594911772125-07fc7a2d8d9f?q=80&w=400&auto=format&fit=crop' },
-      { name: 'Leg Raises', duration: 45, image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?q=80&w=400&auto=format&fit=crop' },
-      { name: 'Plank Jacks', duration: 45, image: 'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?q=80&w=400&auto=format&fit=crop' },
-      { name: 'Russian Twists', duration: 45, image: 'https://images.unsplash.com/photo-1599058917233-358368395ff6?q=80&w=400&auto=format&fit=crop' },
     ]
   }
 ];

@@ -256,8 +256,8 @@ export default function TabLayout() {
           tabBarButton: (props) => (
             <PremiumTabButton
               {...props}
-              activeIcon="fitness"
-              inactiveIcon="fitness-outline"
+              activeIcon="barbell"
+              inactiveIcon="barbell-outline"
               accentColor="#7C4DFF"
             />
           ),
