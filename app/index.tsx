@@ -1,14 +1,15 @@
-import { Redirect } from 'expo-router';
+import { useEffect } from 'react';
+import { useRouter } from 'expo-router';
 import { useUserStore } from '../store/userStore';
 
 export default function Index() {
   const { hasChosenUser, _hasHydrated } = useUserStore();
+  const router = useRouter();
 
-  if (!_hasHydrated) return null;
+  useEffect(() => {
+    if (!_hasHydrated) return;
+    router.replace(hasChosenUser ? '/tasks' : '/select-user');
+  }, [_hasHydrated, hasChosenUser, router]);
 
-  if (!hasChosenUser) {
-    return <Redirect href="/select-user" />;
-  }
-  
-  return <Redirect href="/tasks" />;
+  return null;
 }
