@@ -45,10 +45,11 @@ const calculateStreak = (dates: string[]) => {
 };
 
 export default function ProfileScreen() {
-  const { currentUserId, partnerId, currentUserName, partnerName, profilePics, setProfilePic } = useUserStore();
+  const { currentUserId, partnerId, currentUserName, partnerName, profilePics, uploadProfilePic } = useUserStore();
   const { tasks, completedDates, fetchStreakData } = useTaskStore();
   const [partnerCompletedDates, setPartnerCompletedDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSavingPhoto, setIsSavingPhoto] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -92,7 +93,12 @@ export default function ProfileScreen() {
     });
 
     if (!result.canceled && currentUserId) {
-      setProfilePic(currentUserId, result.assets[0].uri);
+      const asset = result.assets[0];
+      setIsSavingPhoto(true);
+      await uploadProfilePic(currentUserId, asset.uri, asset.mimeType).catch((error) => {
+        console.warn('Failed to sync profile picture', error);
+      });
+      setIsSavingPhoto(false);
     }
   };
 
@@ -135,7 +141,11 @@ export default function ProfileScreen() {
               )}
             </View>
             <View style={styles.editBadge}>
-              <Ionicons name="camera" size={14} color="#FFF" />
+              {isSavingPhoto ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Ionicons name="camera" size={14} color="#FFF" />
+              )}
             </View>
           </Pressable>
           <Text style={styles.userName}>{currentUserName}</Text>

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
-import { useUserStore } from '../store/userStore';
+import { RAKSHIT_ID, SNEH_ID, useUserStore } from '../store/userStore';
 import { StatusBar } from 'expo-status-bar';
 import {
   addNotificationResponseListener,
@@ -14,6 +14,8 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
   const fetchReminderSettings = useReminderStore((state) => state.fetchSettings);
+  const fetchProfilePics = useUserStore((state) => state.fetchProfilePics);
+  const subscribeToProfilePics = useUserStore((state) => state.subscribeToProfilePics);
 
   useEffect(() => {
     if (!_hasHydrated) return;
@@ -47,6 +49,14 @@ export default function RootLayout() {
   }, [currentUserId, fetchReminderSettings]);
 
   useEffect(() => {
+    if (!_hasHydrated) return;
+
+    const profileIds = [RAKSHIT_ID, SNEH_ID];
+    void fetchProfilePics(profileIds);
+    return subscribeToProfilePics(profileIds);
+  }, [_hasHydrated, fetchProfilePics, subscribeToProfilePics]);
+
+  useEffect(() => {
     const redirectFromNotification = (notification: any) => {
       const url = notification?.request?.content?.data?.url;
       if (typeof url === 'string') {
@@ -54,13 +64,15 @@ export default function RootLayout() {
       }
     };
 
+    let active = true;
+
     void getLastNotificationResponseAsync().then((response) => {
+      if (!active) return;
       if (response?.notification) {
         redirectFromNotification(response.notification);
       }
     });
 
-    let active = true;
     let subscription: { remove: () => void } | null = null;
 
     void addNotificationResponseListener((nextResponse) => {
