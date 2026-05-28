@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Pressable, Dimensions, Modal, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Pressable, Dimensions, Modal, SafeAreaView, ActivityIndicator, Animated, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../constants/colors';
 import { BlurView } from 'expo-blur';
@@ -79,27 +79,81 @@ const WORKOUTS: Workout[] = [
 export default function WorkoutScreen() {
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState<'preview' | 'countdown' | 'active'>('preview');
+  const [countdown, setCountdown] = useState(3);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [isResting, setIsResting] = useState(false);
+  
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownScale = useRef(new Animated.Value(0)).current;
+  const countdownOpacity = useRef(new Animated.Value(0)).current;
 
   const startWorkout = (workout: Workout) => {
     setSelectedWorkout(workout);
     setIsSessionActive(true);
+    setSessionStatus('preview');
     setCurrentExerciseIndex(0);
-    setTimeLeft(workout.exercises[0].duration);
+  };
+
+  const beginCountdown = () => {
+    setSessionStatus('countdown');
+    setCountdown(3);
+    animateCountdown();
+  };
+
+  const animateCountdown = () => {
+    countdownScale.setValue(0);
+    countdownOpacity.setValue(0);
+    
+    Animated.parallel([
+      Animated.spring(countdownScale, {
+        toValue: 1,
+        tension: 40,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.timing(countdownOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const startActiveSession = () => {
+    if (!selectedWorkout) return;
+    setSessionStatus('active');
+    setTimeLeft(selectedWorkout.exercises[0].duration);
     setIsResting(false);
   };
 
   const endWorkout = () => {
     setIsSessionActive(false);
+    setSessionStatus('preview');
     setSelectedWorkout(null);
     if (timerRef.current) clearInterval(timerRef.current);
   };
 
   useEffect(() => {
-    if (isSessionActive && timeLeft > 0) {
+    if (sessionStatus === 'countdown') {
+      const cdTimer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(cdTimer);
+            startActiveSession();
+            return 0;
+          }
+          animateCountdown();
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(cdTimer);
+    }
+  }, [sessionStatus]);
+
+  useEffect(() => {
+    if (isSessionActive && sessionStatus === 'active' && timeLeft > 0) {
       timerRef.current = setInterval(() => {
         setTimeLeft(prev => prev - 1);
       }, 1000);
@@ -170,80 +224,120 @@ export default function WorkoutScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      <Modal visible={isSessionActive} animationType="slide" transparent>
-        <BlurView intensity={100} tint="light" style={StyleSheet.absoluteFill}>
-          <SafeAreaView style={styles.sessionContainer}>
-            {selectedWorkout && (
-              <>
-                <View style={styles.sessionHeader}>
-                  <Pressable onPress={endWorkout} style={styles.closeBtn}>
-                    <Ionicons name="close-circle" size={32} color={colors.textPrimary} />
-                  </Pressable>
-                  <View style={styles.sessionTitleContainer}>
-                    <Text style={styles.sessionTitle}>{selectedWorkout.title}</Text>
-                    <Text style={styles.sessionSubtitle}>Day 1 • 30 mins</Text>
-                  </View>
-                  <View style={{ width: 40 }} />
+      <Modal visible={isSessionActive} animationType="slide">
+        <SafeAreaView style={styles.sessionContainer}>
+          {selectedWorkout && (
+            <>
+              <View style={styles.sessionHeader}>
+                <Pressable onPress={endWorkout} style={styles.closeBtn}>
+                  <Ionicons name="close-circle" size={32} color={colors.textPrimary} />
+                </Pressable>
+                <View style={styles.sessionTitleContainer}>
+                  <Text style={styles.sessionTitle}>{selectedWorkout.title}</Text>
+                  <Text style={styles.sessionSubtitle}>Day 1 • 30 mins</Text>
                 </View>
+                <View style={{ width: 40 }} />
+              </View>
 
-                <View style={styles.exerciseContent}>
-                  <View style={styles.imageContainer}>
-                    <Image 
-                      source={{ uri: isResting ? 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=600&auto=format&fit=crop' : selectedWorkout.exercises[currentExerciseIndex].image }} 
-                      style={styles.exerciseImage} 
-                    />
-                    {isResting && (
-                      <View style={styles.restOverlay}>
-                        <Text style={styles.restText}>REST</Text>
-                      </View>
-                    )}
-                  </View>
-                  
-                  <View style={styles.timerContainer}>
-                    <Text style={styles.timerLabel}>
-                      {isResting ? 'Get Ready For' : selectedWorkout.exercises[currentExerciseIndex].name}
-                    </Text>
-                    <Text style={[styles.timeLeft, isResting && { color: colors.accentMint }]}>
-                      {timeLeft}s
-                    </Text>
-                  </View>
-
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                      <View 
-                        style={[
-                          styles.progressFill, 
-                          { width: `${((currentExerciseIndex + (isResting ? 0.5 : 0)) / selectedWorkout.exercises.length) * 100}%` }
-                        ]} 
-                      />
+              {sessionStatus === 'preview' && (
+                <View style={styles.previewContent}>
+                  <Image source={{ uri: selectedWorkout.image }} style={styles.previewImage} />
+                  <Text style={styles.previewTitle}>Get Ready!</Text>
+                  <Text style={styles.previewDescription}>{selectedWorkout.description}</Text>
+                  <View style={styles.previewMeta}>
+                    <View style={styles.metaItem}>
+                      <Ionicons name="time-outline" size={20} color={colors.accent} />
+                      <Text style={styles.metaText}>30 Mins</Text>
                     </View>
-                    <Text style={styles.progressText}>
-                      Exercise {currentExerciseIndex + 1} of {selectedWorkout.exercises.length}
-                    </Text>
+                    <View style={styles.metaItem}>
+                      <Ionicons name="flame-outline" size={20} color={colors.streakOrange} />
+                      <Text style={styles.metaText}>350 kcal</Text>
+                    </View>
                   </View>
+                  <Pressable style={styles.startWorkoutBtn} onPress={beginCountdown}>
+                    <Text style={styles.startWorkoutBtnText}>Start Workout</Text>
+                  </Pressable>
                 </View>
+              )}
 
-                <View style={styles.sessionFooter}>
-                  <BlurView intensity={20} tint="light" style={styles.footerBlur}>
-                    <View style={styles.nextUp}>
-                      <Text style={styles.nextLabel}>NEXT UP</Text>
-                      <Text style={styles.nextExercise}>
-                        {currentExerciseIndex + 1 < selectedWorkout.exercises.length 
-                          ? selectedWorkout.exercises[currentExerciseIndex + 1].name 
-                          : 'Workout Complete!'}
+              {sessionStatus === 'countdown' && (
+                <View style={styles.countdownContent}>
+                  <Animated.Text 
+                    style={[
+                      styles.countdownNumber, 
+                      { 
+                        opacity: countdownOpacity,
+                        transform: [{ scale: countdownScale }]
+                      }
+                    ]}
+                  >
+                    {countdown}
+                  </Animated.Text>
+                  <Text style={styles.countdownLabel}>GET READY</Text>
+                </View>
+              )}
+
+              {sessionStatus === 'active' && (
+                <>
+                  <View style={styles.exerciseContent}>
+                    <View style={styles.imageContainer}>
+                      <Image 
+                        source={{ uri: isResting ? 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=600&auto=format&fit=crop' : selectedWorkout.exercises[currentExerciseIndex].image }} 
+                        style={styles.exerciseImage} 
+                      />
+                      {isResting && (
+                        <View style={styles.restOverlay}>
+                          <Text style={styles.restText}>REST</Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    <View style={styles.timerContainer}>
+                      <Text style={styles.timerLabel}>
+                        {isResting ? 'Get Ready For' : selectedWorkout.exercises[currentExerciseIndex].name}
+                      </Text>
+                      <Text style={[styles.timeLeft, isResting && { color: colors.accentMint }]}>
+                        {timeLeft}s
                       </Text>
                     </View>
-                    <Ionicons 
-                      name={currentExerciseIndex + 1 < selectedWorkout.exercises.length ? "arrow-forward" : "checkmark-done"} 
-                      size={24} 
-                      color={colors.accent} 
-                    />
-                  </BlurView>
-                </View>
-              </>
-            )}
-          </SafeAreaView>
-        </BlurView>
+
+                    <View style={styles.progressContainer}>
+                      <View style={styles.progressBar}>
+                        <View 
+                          style={[
+                            styles.progressFill, 
+                            { width: `${((currentExerciseIndex + (isResting ? 0.5 : 0)) / selectedWorkout.exercises.length) * 100}%` }
+                          ]} 
+                        />
+                      </View>
+                      <Text style={styles.progressText}>
+                        Exercise {currentExerciseIndex + 1} of {selectedWorkout.exercises.length}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.sessionFooter}>
+                    <BlurView intensity={20} tint="light" style={styles.footerBlur}>
+                      <View style={styles.nextUp}>
+                        <Text style={styles.nextLabel}>NEXT UP</Text>
+                        <Text style={styles.nextExercise}>
+                          {currentExerciseIndex + 1 < selectedWorkout.exercises.length 
+                            ? selectedWorkout.exercises[currentExerciseIndex + 1].name 
+                            : 'Workout Complete!'}
+                        </Text>
+                      </View>
+                      <Ionicons 
+                        name={currentExerciseIndex + 1 < selectedWorkout.exercises.length ? "arrow-forward" : "checkmark-done"} 
+                        size={24} 
+                        color={colors.accent} 
+                      />
+                    </BlurView>
+                  </View>
+                </>
+              )}
+            </>
+          )}
+        </SafeAreaView>
       </Modal>
     </View>
   );
@@ -353,7 +447,7 @@ const styles = StyleSheet.create({
   },
   sessionContainer: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: '#FFF',
   },
   sessionHeader: {
     flexDirection: 'row',
@@ -485,5 +579,85 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  previewContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 30,
+  },
+  previewImage: {
+    width: width - 80,
+    height: 240,
+    borderRadius: 30,
+    marginBottom: 30,
+  },
+  previewTitle: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: colors.textPrimary,
+    marginBottom: 10,
+  },
+  previewDescription: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 30,
+  },
+  previewMeta: {
+    flexDirection: 'row',
+    gap: 20,
+    marginBottom: 40,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  metaText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  startWorkoutBtn: {
+    backgroundColor: colors.accent,
+    width: '100%',
+    height: 64,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: colors.accent,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+  },
+  startWorkoutBtnText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  countdownContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countdownNumber: {
+    fontSize: 160,
+    fontWeight: '900',
+    color: colors.accent,
+  },
+  countdownLabel: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.textSecondary,
+    letterSpacing: 4,
+    marginTop: -20,
   }
 });
