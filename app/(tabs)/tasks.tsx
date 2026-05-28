@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef, memo, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TextInput, Pressable, KeyboardAvoidingView, Platform, Modal, Animated } from 'react-native';
+import React, { useCallback, useEffect, useState, useRef, memo, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TextInput, Pressable, KeyboardAvoidingView, Platform, Modal, Animated, Keyboard } from 'react-native';
 import { useUserStore, RAKSHIT_ID, SNEH_ID } from '../../store/userStore';
 import { useTaskStore, Task } from '../../store/taskStore';
 import { TaskItem } from '../../components/TaskItem';
@@ -62,8 +62,50 @@ const TaskList = memo(({
   onLongPress: (task: Task) => void
 }) => {
   const [text, setText] = useState('');
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const completedCount = data.filter(t => t.is_done).length;
   const scrollViewRef = useRef<ScrollView>(null);
+  const scrollTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearScrollTimers = useCallback(() => {
+    scrollTimersRef.current.forEach(clearTimeout);
+    scrollTimersRef.current = [];
+  }, []);
+
+  const scrollToInput = useCallback(() => {
+    clearScrollTimers();
+    // Start scrolling immediately
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+    
+    // Series of staggered retries to catch the layout as the keyboard animates in
+    scrollTimersRef.current = [50, 100, 200, 400, 600].map((delay) =>
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        });
+      }, delay)
+    );
+  }, [clearScrollTimers]);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow',
+      () => {
+        // Force scroll when keyboard appears, even if already focused
+        scrollToInput();
+      }
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide',
+      () => setIsInputFocused(false)
+    );
+
+    return () => {
+      clearScrollTimers();
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [clearScrollTimers, scrollToInput, isInputFocused]);
 
   const handleSubmit = () => {
     if (!text.trim()) return;
@@ -71,6 +113,13 @@ const TaskList = memo(({
     setText('');
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
   };
+
+  const dynamicSpacerHeight = useMemo(() => {
+    if (Platform.OS !== 'android' || !isInputFocused) return 0;
+    // With KeyboardAvoidingView behavior=undefined, the OS resizes the window.
+    // We just need a small buffer so the input isn't touching the keyboard edge.
+    return 40; 
+  }, [isInputFocused]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -94,6 +143,11 @@ const TaskList = memo(({
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => {
+          if (isInputFocused) {
+            scrollToInput();
+          }
+        }}
       >
         {data.map((item) => (
           <TaskItem
@@ -117,8 +171,10 @@ const TaskList = memo(({
             returnKeyType="done"
             blurOnSubmit={false}
             onFocus={() => {
-              setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 200);
+              setIsInputFocused(true);
+              scrollToInput();
             }}
+            onBlur={() => setIsInputFocused(false)}
           />
           {text.length > 0 && (
             <Pressable onPress={handleSubmit} style={styles.addBtnSmall}>
@@ -126,7 +182,7 @@ const TaskList = memo(({
             </Pressable>
           )}
         </View>
-        <View style={{ height: 60 }} />
+        <View style={{ height: isInputFocused ? dynamicSpacerHeight : 80 }} />
       </ScrollView>
     </View>
   );
