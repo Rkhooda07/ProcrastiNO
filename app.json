@@ -5,15 +5,16 @@
     "version": "1.0.0",
     "scheme": "procrastino",
     "orientation": "portrait",
-    "icon": "./assets/android-icon-foreground.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.rkhooda.procrastino"
     },
     "android": {
+      "icon": "./assets/icon.png",
       "adaptiveIcon": {
-        "backgroundImage": "./assets/android-icon-background.png",
+        "backgroundColor": "#FFF8EE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
