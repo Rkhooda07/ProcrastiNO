@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Pressable, Dimensions, Modal, SafeAreaView, ActivityIndicator, Animated, Platform, PanResponder, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Pressable, Dimensions, Modal, ActivityIndicator, Animated, Platform, PanResponder, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../constants/colors';
 import { BlurView } from 'expo-blur';
@@ -21,6 +22,7 @@ interface Exercise {
   name: string;
   duration: number; // in seconds
   image: string;
+  restDuration?: number; // custom rest after this exercise
 }
 
 interface Workout {
@@ -32,18 +34,38 @@ interface Workout {
   exercises: Exercise[];
 }
 
+const CORE_EXERCISES: Exercise[] = [
+  { name: 'Plank Hold', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1566241134883-13eb2393a3cc?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Crunches', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1594911772125-07fc7a2d8d9f?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Leg Raises', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Russian Twists', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1599058917233-358368395ff6?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Bicycle Crunches', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Mountain Climbers (Slow)', duration: 40, restDuration: 20, image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Flutter Kicks', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Dead Bug', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Side Plank — Left', duration: 30, restDuration: 10, image: 'https://images.unsplash.com/photo-1566241134883-13eb2393a3cc?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Side Plank — Right', duration: 30, restDuration: 10, image: 'https://images.unsplash.com/photo-1566241134883-13eb2393a3cc?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Superman Hold', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1594911772125-07fc7a2d8d9f?q=80&w=400&auto=format&fit=crop' },
+];
+
 const WORKOUTS: Workout[] = [
   {
     id: '4',
     title: 'Core Shredder',
-    description: 'Targeted core exercises for weight loss and abdominal definition.',
-    duration: '30 min',
+    description: 'Master your midsection with this 28-minute intense core circuit.',
+    duration: '28 min',
     image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=600&auto=format&fit=crop',
     exercises: [
-      { name: 'Crunches', duration: 45, image: 'https://images.unsplash.com/photo-1594911772125-07fc7a2d8d9f?q=80&w=400&auto=format&fit=crop' },
-      { name: 'Leg Raises', duration: 45, image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?q=80&w=400&auto=format&fit=crop' },
-      { name: 'Plank Jacks', duration: 45, image: 'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?q=80&w=400&auto=format&fit=crop' },
-      { name: 'Russian Twists', duration: 45, image: 'https://images.unsplash.com/photo-1599058917233-358368395ff6?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Cat-Cow Stretch', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Bird Dog', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Glute Bridge Hold', duration: 60, restDuration: 5, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
+      ...CORE_EXERCISES.map((ex, idx) => 
+        idx === CORE_EXERCISES.length - 1 ? { ...ex, restDuration: 90 } : ex 
+      ),
+      ...CORE_EXERCISES,
+      { name: "Child's Pose", duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Seated Forward Fold', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Supine Spinal Twist', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
     ]
   },
   {
@@ -95,38 +117,42 @@ export default function WorkoutScreen() {
   const [countdown, setCountdown] = useState(3);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [totalTime, setTotalTime] = useState(0);
   const [isResting, setIsResting] = useState(false);
   const [randomQuote, setRandomQuote] = useState("");
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [pendingSavedWorkout, setPendingSavedWorkout] = useState<any>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [showControls, setShowControls] = useState(false);
   
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isExitingRef = useRef(false);
+  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownScale = useRef(new Animated.Value(0)).current;
   const countdownOpacity = useRef(new Animated.Value(0)).current;
   const pan = useRef(new Animated.ValueXY()).current;
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const calculateTotalDuration = (workout: Workout) => {
+    return workout.exercises.reduce((acc, ex) => acc + ex.duration + (ex.restDuration || 0), 0);
+  };
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return gestureState.dy > 10 && Math.abs(gestureState.dx) < 30;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          pan.y.setValue(gestureState.dy);
-        }
-      },
+      onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 10 && Math.abs(gestureState.dx) < 30,
+      onPanResponderMove: (_, gestureState) => { if (gestureState.dy > 0) pan.y.setValue(gestureState.dy); },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 150 || gestureState.vy > 0.5) {
           handleExitSession();
         } else {
-          Animated.spring(pan.y, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 50,
-            friction: 10,
-          }).start();
+          Animated.spring(pan.y, { toValue: 0, useNativeDriver: true, tension: 50, friction: 10 }).start();
         }
       },
     })
@@ -146,20 +172,15 @@ export default function WorkoutScreen() {
       });
     }
     
-    Animated.timing(pan.y, {
-      toValue: height,
-      duration: 300,
-      useNativeDriver: true
-    }).start(() => {
-      // 1. Hide modal first
+    Animated.timing(pan.y, { toValue: height, duration: 300, useNativeDriver: true }).start(() => {
       setIsSessionActive(false);
-      
-      // 2. Delay state cleanup slightly to ensure modal has unmounted
-      // This prevents the 'blink' caused by the UI clearing while modal is still visible
       setTimeout(() => {
         setSessionStatus('preview');
         setSelectedWorkout(null);
         setShowResumePrompt(false);
+        setIsPaused(false);
+        setShowControls(false);
+        setElapsedTime(0);
         if (timerRef.current) clearInterval(timerRef.current);
         pan.y.setValue(0);
         isExitingRef.current = false;
@@ -169,9 +190,14 @@ export default function WorkoutScreen() {
 
   const startWorkout = (workout: Workout) => {
     const saved = getProgress(workout.id);
+    const total = calculateTotalDuration(workout);
     setSelectedWorkout(workout);
+    setTotalTime(total);
     pan.setValue({ x: 0, y: 0 });
     isExitingRef.current = false;
+    setIsPaused(false);
+    setShowControls(false);
+    setElapsedTime(0);
     
     if (saved) {
       setPendingSavedWorkout(saved);
@@ -180,13 +206,17 @@ export default function WorkoutScreen() {
       setSessionStatus('preview');
       setCurrentExerciseIndex(0);
     }
-    
-    // Open modal AFTER state is set to avoid initial 'blink'
     setIsSessionActive(true);
   };
 
   const handleResume = () => {
-    if (pendingSavedWorkout) {
+    if (pendingSavedWorkout && selectedWorkout) {
+      let elapsed = 0;
+      for (let i = 0; i < pendingSavedWorkout.exerciseIndex; i++) {
+        elapsed += selectedWorkout.exercises[i].duration + (selectedWorkout.exercises[i].restDuration || 0);
+      }
+      if (pendingSavedWorkout.isResting) elapsed += selectedWorkout.exercises[pendingSavedWorkout.exerciseIndex].duration;
+      setElapsedTime(elapsed);
       setSessionStatus('active');
       setCurrentExerciseIndex(pendingSavedWorkout.exerciseIndex);
       setTimeLeft(pendingSavedWorkout.timeLeft);
@@ -204,11 +234,48 @@ export default function WorkoutScreen() {
     setPendingSavedWorkout(null);
   };
 
-  const beginCountdown = () => {
-    setSessionStatus('countdown');
-    setCountdown(3);
-    animateCountdown();
+  const skipToNext = () => {
+    if (!selectedWorkout) return;
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (!isResting) {
+      const currentExercise = selectedWorkout.exercises[currentExerciseIndex];
+      const restTime = currentExercise?.restDuration ?? 15;
+      setElapsedTime(prev => prev + timeLeft);
+      if (restTime > 0) {
+        setIsResting(true);
+        setTimeLeft(restTime);
+      } else {
+        advanceToNextExercise();
+      }
+    } else {
+      setElapsedTime(prev => prev + timeLeft);
+      advanceToNextExercise();
+    }
   };
+
+  const advanceToNextExercise = () => {
+    if (!selectedWorkout) return;
+    const nextIndex = currentExerciseIndex + 1;
+    if (nextIndex < selectedWorkout.exercises.length) {
+      setCurrentExerciseIndex(nextIndex);
+      setIsResting(false);
+      setTimeLeft(selectedWorkout.exercises[nextIndex].duration);
+    } else {
+      if (selectedWorkout) clearProgress(selectedWorkout.id);
+      setRandomQuote(MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
+      setSessionStatus('completed');
+    }
+  };
+
+  const togglePlayback = () => { setIsPaused(prev => !prev); flashControls(); };
+
+  const flashControls = () => {
+    setShowControls(true);
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    controlsTimerRef.current = setTimeout(() => setShowControls(false), 2500);
+  };
+
+  const beginCountdown = () => { setSessionStatus('countdown'); setCountdown(3); animateCountdown(); };
 
   const animateCountdown = () => {
     countdownScale.setValue(0);
@@ -224,17 +291,14 @@ export default function WorkoutScreen() {
     setSessionStatus('active');
     setTimeLeft(selectedWorkout.exercises[0].duration);
     setIsResting(false);
+    setElapsedTime(0);
   };
 
   useEffect(() => {
     if (sessionStatus === 'countdown') {
       const cdTimer = setInterval(() => {
         setCountdown(prev => {
-          if (prev <= 1) {
-            clearInterval(cdTimer);
-            startActiveSession();
-            return 0;
-          }
+          if (prev <= 1) { clearInterval(cdTimer); startActiveSession(); return 0; }
           animateCountdown();
           return prev - 1;
         });
@@ -244,31 +308,20 @@ export default function WorkoutScreen() {
   }, [sessionStatus]);
 
   useEffect(() => {
-    if (isSessionActive && sessionStatus === 'active' && timeLeft > 0) {
+    if (isSessionActive && sessionStatus === 'active' && timeLeft > 0 && !isPaused) {
       timerRef.current = setInterval(() => {
         setTimeLeft(prev => prev - 1);
+        setElapsedTime(prev => prev + 1);
       }, 1000);
     } else if (isSessionActive && sessionStatus === 'active' && timeLeft === 0) {
       if (timerRef.current) clearInterval(timerRef.current);
-      
-      if (!isResting) {
-        setIsResting(true);
-        setTimeLeft(15);
-      } else {
-        const nextIndex = currentExerciseIndex + 1;
-        if (selectedWorkout && nextIndex < selectedWorkout.exercises.length) {
-          setCurrentExerciseIndex(nextIndex);
-          setIsResting(false);
-          setTimeLeft(selectedWorkout.exercises[nextIndex].duration);
-        } else {
-          if (selectedWorkout) clearProgress(selectedWorkout.id);
-          setRandomQuote(MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
-          setSessionStatus('completed');
-        }
-      }
+      const currentExercise = selectedWorkout?.exercises[currentExerciseIndex];
+      const restTime = currentExercise?.restDuration ?? 15;
+      if (!isResting && restTime > 0) { setIsResting(true); setTimeLeft(restTime); }
+      else { advanceToNextExercise(); }
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [isSessionActive, timeLeft, isResting, currentExerciseIndex, selectedWorkout, sessionStatus]);
+  }, [isSessionActive, timeLeft, isResting, currentExerciseIndex, selectedWorkout, sessionStatus, isPaused]);
 
   const renderWorkoutCard = (workout: Workout) => (
     <Pressable key={workout.id} style={styles.card} onPress={() => startWorkout(workout)}>
@@ -299,53 +352,34 @@ export default function WorkoutScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      <Modal 
-        visible={isSessionActive} 
-        animationType="none" 
-        transparent={true}
-        onRequestClose={handleExitSession}
-      >
+      <Modal visible={isSessionActive} animationType="none" transparent={true} onRequestClose={handleExitSession}>
         <View style={styles.modalOverlay}>
-          <Animated.View 
-            style={[
-              styles.sessionContainer,
-              { transform: [{ translateY: pan.y }] }
-            ]}
-            {...panResponder.panHandlers}
-          >
+          <Animated.View style={[styles.sessionContainer, { transform: [{ translateY: pan.y }] }]} {...panResponder.panHandlers}>
             {showResumePrompt ? (
               <View style={styles.resumePromptContent}>
                 <View style={styles.resumeCard}>
-                  <View style={styles.resumeIconContainer}>
-                    <Ionicons name="refresh-circle" size={60} color={colors.accent} />
-                  </View>
+                  <View style={styles.resumeIconContainer}><Ionicons name="refresh-circle" size={60} color={colors.accent} /></View>
                   <Text style={styles.resumeTitle}>Resume?</Text>
-                  <Text style={styles.resumeDescription}>
-                    Pick up where you left off or start fresh?
-                  </Text>
+                  <Text style={styles.resumeDescription}>Pick up where you left off or start fresh?</Text>
                   <View style={styles.resumeActions}>
-                    <Pressable style={[styles.resumeBtn, styles.resumeBtnPrimary]} onPress={handleResume}>
-                      <Text style={styles.resumeBtnTextPrimary}>Resume</Text>
-                    </Pressable>
-                    <Pressable style={[styles.resumeBtn, styles.resumeBtnSecondary]} onPress={handleStartOver}>
-                      <Text style={styles.resumeBtnTextSecondary}>Start Over</Text>
-                    </Pressable>
+                    <Pressable style={[styles.resumeBtn, styles.resumeBtnPrimary]} onPress={handleResume}><Text style={styles.resumeBtnTextPrimary}>Resume</Text></Pressable>
+                    <Pressable style={[styles.resumeBtn, styles.resumeBtnSecondary]} onPress={handleStartOver}><Text style={styles.resumeBtnTextSecondary}>Start Over</Text></Pressable>
                   </View>
                 </View>
               </View>
             ) : (
-              <SafeAreaView style={styles.workoutContent}>
+              <SafeAreaView style={styles.workoutContent} edges={['top', 'left', 'right']}>
                 {selectedWorkout && (
                   <>
                     <View style={styles.sessionHeader}>
-                      <Pressable onPress={handleExitSession} style={styles.closeBtn}>
-                        <Ionicons name="close-circle" size={32} color={colors.textPrimary} />
-                      </Pressable>
+                      <Pressable onPress={handleExitSession} style={styles.closeBtn}><Ionicons name="close-circle" size={32} color={colors.textPrimary} /></Pressable>
                       <View style={styles.sessionTitleContainer}>
                         <Text style={styles.sessionTitle}>{selectedWorkout.title}</Text>
                         <Text style={styles.sessionSubtitle}>Day 1 • 30 mins</Text>
                       </View>
-                      <View style={{ width: 40 }} />
+                      <View style={styles.progressTimer}>
+                        <Text style={styles.progressTimerText}>{formatTime(elapsedTime)} / {formatTime(totalTime)}</Text>
+                      </View>
                     </View>
 
                     {sessionStatus === 'preview' && (
@@ -370,28 +404,37 @@ export default function WorkoutScreen() {
 
                     {sessionStatus === 'active' && (
                       <>
-                        <View style={styles.exerciseContent}>
+                        <Pressable style={styles.exerciseContent} onPress={flashControls}>
                           <View style={styles.imageContainer}>
                             <Image source={{ uri: isResting ? 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=600&auto=format&fit=crop' : selectedWorkout.exercises[currentExerciseIndex].image }} style={styles.exerciseImage} />
                             {isResting && <View style={styles.restOverlay}><Text style={styles.restText}>REST</Text></View>}
+                            {showControls && (
+                              <View style={styles.controlsOverlay}>
+                                <Pressable style={styles.playbackBtn} onPress={togglePlayback}>
+                                  <Ionicons name={isPaused ? "play" : "pause"} size={48} color="#FFF" />
+                                </Pressable>
+                              </View>
+                            )}
                           </View>
                           <View style={styles.timerContainer}>
-                            <Text style={styles.timerLabel}>{isResting ? 'Get Ready For' : selectedWorkout.exercises[currentExerciseIndex].name}</Text>
-                            <Text style={[styles.timeLeft, isResting && { color: colors.accentMint }]}>{timeLeft}s</Text>
+                            <Text style={styles.timerLabel}>{isPaused ? 'PAUSED' : (isResting ? 'Get Ready For' : selectedWorkout.exercises[currentExerciseIndex].name)}</Text>
+                            <Text style={[styles.timeLeft, isResting && { color: colors.accentMint }, isPaused && { color: colors.textSecondary }]}>{timeLeft}s</Text>
                           </View>
                           <View style={styles.progressContainer}>
                             <View style={styles.progressBar}><View style={[styles.progressFill, { width: `${((currentExerciseIndex + (isResting ? 0.5 : 0)) / selectedWorkout.exercises.length) * 100}%` }]} /></View>
                             <Text style={styles.progressText}>Exercise {currentExerciseIndex + 1} of {selectedWorkout.exercises.length}</Text>
                           </View>
-                        </View>
+                        </Pressable>
                         <View style={styles.sessionFooter}>
-                          <BlurView intensity={20} tint="light" style={styles.footerBlur}>
-                            <View style={styles.nextUp}>
-                              <Text style={styles.nextLabel}>NEXT UP</Text>
-                              <Text style={styles.nextExercise}>{currentExerciseIndex + 1 < selectedWorkout.exercises.length ? selectedWorkout.exercises[currentExerciseIndex + 1].name : 'Workout Complete!'}</Text>
-                            </View>
-                            <Ionicons name={currentExerciseIndex + 1 < selectedWorkout.exercises.length ? "arrow-forward" : "checkmark-done"} size={24} color={colors.accent} />
-                          </BlurView>
+                          <Pressable style={styles.footerBlurContainer} onPress={skipToNext}>
+                            <BlurView intensity={20} tint="light" style={styles.footerBlur}>
+                              <View style={styles.nextUp}>
+                                <Text style={styles.nextLabel}>NEXT UP</Text>
+                                <Text style={styles.nextExercise}>{currentExerciseIndex + 1 < selectedWorkout.exercises.length ? selectedWorkout.exercises[currentExerciseIndex + 1].name : 'Workout Complete!'}</Text>
+                              </View>
+                              <Ionicons name={currentExerciseIndex + 1 < selectedWorkout.exercises.length ? "arrow-forward" : "checkmark-done"} size={24} color={colors.accent} />
+                            </BlurView>
+                          </Pressable>
                         </View>
                       </>
                     )}
@@ -440,26 +483,16 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
   cardDescription: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
   playIconContainer: { position: 'absolute', right: 20, bottom: 80, width: 48, height: 48, borderRadius: 24, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', elevation: 4, shadowColor: colors.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
-  sessionContainer: { 
-    flex: 1, 
-    backgroundColor: 'transparent',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    overflow: 'hidden',
-  },
-  workoutContent: {
-    flex: 1,
-    backgroundColor: '#FFF',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)', 
-  },
+  sessionContainer: { flex: 1, backgroundColor: 'transparent', borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' },
+  workoutContent: { flex: 1, backgroundColor: '#FFF' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
   sessionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, height: 80 },
   sessionTitleContainer: { alignItems: 'center' },
   sessionSubtitle: { fontSize: 12, color: colors.textSecondary, fontWeight: '600', marginTop: 2 },
   closeBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   sessionTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  progressTimer: { minWidth: 80, alignItems: 'flex-end' },
+  progressTimerText: { fontSize: 14, fontWeight: '700', color: colors.accent, fontVariant: ['tabular-nums'] },
   exerciseContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
   imageContainer: { width: width - 60, height: width - 60, borderRadius: 40, overflow: 'hidden', backgroundColor: colors.border, elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.15, shadowRadius: 20, marginBottom: 40 },
   exerciseImage: { width: '100%', height: '100%' },
@@ -472,8 +505,11 @@ const styles = StyleSheet.create({
   progressBar: { width: '100%', height: 10, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 5, marginBottom: 12, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: colors.accent, borderRadius: 5 },
   progressText: { fontSize: 14, color: colors.textSecondary, fontWeight: '700' },
+  controlsOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  playbackBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
   sessionFooter: { paddingHorizontal: 20, paddingBottom: 40 },
-  footerBlur: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 24, borderRadius: 30, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)' },
+  footerBlurContainer: { borderRadius: 30, overflow: 'hidden' },
+  footerBlur: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 24, backgroundColor: 'rgba(255,255,255,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)' },
   nextUp: { flex: 1 },
   nextLabel: { fontSize: 11, fontWeight: '800', color: colors.textSecondary, letterSpacing: 1.5, marginBottom: 4 },
   nextExercise: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
