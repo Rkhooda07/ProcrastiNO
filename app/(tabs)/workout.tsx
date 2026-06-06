@@ -48,6 +48,20 @@ const CORE_EXERCISES: Exercise[] = [
   { name: 'Superman Hold', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1594911772125-07fc7a2d8d9f?q=80&w=400&auto=format&fit=crop' },
 ];
 
+const CARDIO_EXERCISES: Exercise[] = [
+  { name: 'Jumping Jacks', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1594911772125-07fc7a2d8d9f?q=80&w=400&auto=format&fit=crop' },
+  { name: 'High Knees', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Butt Kicks', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Lateral Shuffles', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1599058917233-358368395ff6?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Skaters', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Jump Squats', duration: 40, restDuration: 20, image: 'https://images.unsplash.com/photo-1574680096145-d05b474e2158?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Burpees', duration: 40, restDuration: 20, image: 'https://images.unsplash.com/photo-1599058917233-358368395ff6?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Mountain Climbers (Fast)', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Star Jumps', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1594911772125-07fc7a2d8d9f?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Speed Bag (Shadowbox)', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Box Step-Ups (Fast)', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1597452485669-2c7bb5fef90d?q=80&w=400&auto=format&fit=crop' },
+];
+
 const WORKOUTS: Workout[] = [
   {
     id: '4',
@@ -72,13 +86,19 @@ const WORKOUTS: Workout[] = [
     id: '1',
     title: 'Cardio Blast',
     description: 'High-intensity cardio to get your heart racing and burn calories fast.',
-    duration: '30 min',
+    duration: '29m 30s',
     image: 'https://images.unsplash.com/photo-1538805060514-97d9cc17730c?q=80&w=600&auto=format&fit=crop',
     exercises: [
-      { name: 'Jumping Jacks', duration: 45, image: 'https://images.unsplash.com/photo-1594911772125-07fc7a2d8d9f?q=80&w=400&auto=format&fit=crop' },
-      { name: 'Mountain Climbers', duration: 45, image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?q=80&w=400&auto=format&fit=crop' },
-      { name: 'High Knees', duration: 45, image: 'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?q=80&w=400&auto=format&fit=crop' },
-      { name: 'Burpees', duration: 30, image: 'https://images.unsplash.com/photo-1599058917233-358368395ff6?q=80&w=400&auto=format&fit=crop' },
+      { name: 'March in Place', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1434608519344-49d77a699e1d?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Arm Circles', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Hip Swing & Rotation', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?q=80&w=400&auto=format&fit=crop' },
+      ...CARDIO_EXERCISES.map((ex, idx) => 
+        idx === CARDIO_EXERCISES.length - 1 ? { ...ex, restDuration: 105 } : ex 
+      ),
+      ...CARDIO_EXERCISES,
+      { name: 'Standing Quad Stretch', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1597452485669-2c7bb5fef90d?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Standing Hamstring Stretch', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1597452485669-2c7bb5fef90d?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Deep Breathing Walk', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
     ]
   },
   {
@@ -407,7 +427,13 @@ export default function WorkoutScreen() {
                         <Pressable style={styles.exerciseContent} onPress={flashControls}>
                           <View style={styles.imageContainer}>
                             <Image source={{ uri: isResting ? 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=600&auto=format&fit=crop' : selectedWorkout.exercises[currentExerciseIndex].image }} style={styles.exerciseImage} />
-                            {isResting && <View style={styles.restOverlay}><Text style={styles.restText}>REST</Text></View>}
+                            {isResting && (
+                              <View style={styles.restOverlay}>
+                                <Text style={[styles.restText, (selectedWorkout.exercises[currentExerciseIndex].restDuration ?? 15) > 60 && { fontSize: 32 }]}>
+                                  {(selectedWorkout.exercises[currentExerciseIndex].restDuration ?? 15) > 60 ? 'ROUND REST' : 'REST'}
+                                </Text>
+                              </View>
+                            )}
                             {showControls && (
                               <View style={styles.controlsOverlay}>
                                 <Pressable style={styles.playbackBtn} onPress={togglePlayback}>
