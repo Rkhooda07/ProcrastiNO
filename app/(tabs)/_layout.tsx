@@ -195,7 +195,7 @@ export default function TabLayout() {
             <BlurView
               intensity={Platform.OS === 'ios' ? 48 : 64}
               tint="light"
-              blurMethod={Platform.OS === 'android' ? 'dimezisBlurViewSdk31Plus' : undefined}
+              blurMethod={Platform.OS === 'android' ? 'none' : undefined}
               style={StyleSheet.absoluteFill}
             />
             <View style={styles.tabBarOverlay} />

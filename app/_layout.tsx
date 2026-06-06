@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Slot, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { RAKSHIT_ID, SNEH_ID, useUserStore } from '../store/userStore';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -13,12 +13,13 @@ export default function RootLayout() {
   const { hasChosenUser, _hasHydrated, currentUserId, resetUser } = useUserStore();
   const segments = useSegments();
   const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
   const fetchReminderSettings = useReminderStore((state) => state.fetchSettings);
   const fetchProfilePics = useUserStore((state) => state.fetchProfilePics);
   const subscribeToProfilePics = useUserStore((state) => state.subscribeToProfilePics);
 
   useEffect(() => {
-    if (!_hasHydrated) return;
+    if (!_hasHydrated || !rootNavigationState?.key) return;
 
     // Force reset if the ID is not a valid UUID (must be 36 characters)
     // This wipes out the old "rakshit-id" and "sneh-id" strings permanently
@@ -34,7 +35,7 @@ export default function RootLayout() {
     } else if (hasChosenUser && isSelectionPage) {
       router.replace('/tasks');
     }
-  }, [hasChosenUser, segments, _hasHydrated]);
+  }, [hasChosenUser, segments, _hasHydrated, rootNavigationState?.key]);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -57,6 +58,8 @@ export default function RootLayout() {
   }, [_hasHydrated, fetchProfilePics, subscribeToProfilePics]);
 
   useEffect(() => {
+    if (!rootNavigationState?.key) return;
+
     const redirectFromNotification = (notification: any) => {
       const url = notification?.request?.content?.data?.url;
       if (typeof url === 'string') {
@@ -89,7 +92,7 @@ export default function RootLayout() {
       active = false;
       subscription?.remove();
     };
-  }, [router]);
+  }, [router, rootNavigationState?.key]);
 
   return (
     <>
