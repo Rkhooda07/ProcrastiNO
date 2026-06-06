@@ -62,6 +62,20 @@ const CARDIO_EXERCISES: Exercise[] = [
   { name: 'Box Step-Ups (Fast)', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1597452485669-2c7bb5fef90d?q=80&w=400&auto=format&fit=crop' },
 ];
 
+const FULL_BODY_EXERCISES: Exercise[] = [
+  { name: 'Bodyweight Squats', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1574680096145-d05b474e2158?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Push-Ups', duration: 40, restDuration: 20, image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Reverse Lunges', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1597452485669-2c7bb5fef90d?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Pike Push-Ups', duration: 40, restDuration: 20, image: 'https://images.unsplash.com/photo-1599058917233-358368395ff6?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Glute Bridges', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Tricep Dips (Floor)', duration: 40, restDuration: 20, image: 'https://images.unsplash.com/photo-1591948970421-14b98694671c?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Single-Leg RDL', duration: 45, restDuration: 15, image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Plank to Downward Dog', duration: 40, restDuration: 20, image: 'https://images.unsplash.com/photo-1566241134883-13eb2393a3cc?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Jump Squats', duration: 40, restDuration: 20, image: 'https://images.unsplash.com/photo-1574680096145-d05b474e2158?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Bear Crawl', duration: 40, restDuration: 20, image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?q=80&w=400&auto=format&fit=crop' },
+  { name: 'Inchworm + Push-Up', duration: 40, restDuration: 20, image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=400&auto=format&fit=crop' },
+];
+
 const WORKOUTS: Workout[] = [
   {
     id: '4',
@@ -103,15 +117,21 @@ const WORKOUTS: Workout[] = [
   },
   {
     id: '2',
-    title: 'Full Body Sculpt',
+    title: 'Full Body',
     description: 'A comprehensive workout targeting every major muscle group for total body definition.',
-    duration: '30 min',
+    duration: '29m 30s',
     image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=600&auto=format&fit=crop',
     exercises: [
-      { name: 'Pushups', duration: 40, image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=400&auto=format&fit=crop' },
-      { name: 'Squats', duration: 40, image: 'https://images.unsplash.com/photo-1574680096145-d05b474e2158?q=80&w=400&auto=format&fit=crop' },
-      { name: 'Lunges', duration: 40, image: 'https://images.unsplash.com/photo-1597452485669-2c7bb5fef90d?q=80&w=400&auto=format&fit=crop' },
-      { name: 'Plank', duration: 60, image: 'https://images.unsplash.com/photo-1566241134883-13eb2393a3cc?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Arm Circles & Shoulder Rolls', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Hip Hinge (Bodyweight)', duration: 45, restDuration: 0, image: 'https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Inchworms', duration: 75, restDuration: 0, image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=400&auto=format&fit=crop' },
+      ...FULL_BODY_EXERCISES.map((ex, idx) => 
+        idx === FULL_BODY_EXERCISES.length - 1 ? { ...ex, restDuration: 110 } : ex 
+      ),
+      ...FULL_BODY_EXERCISES,
+      { name: 'Hip Flexor Stretch (Kneeling)', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1597452485669-2c7bb5fef90d?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Chest Opener Stretch', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop' },
+      { name: 'Lying Hamstring Stretch', duration: 60, restDuration: 0, image: 'https://images.unsplash.com/photo-1597452485669-2c7bb5fef90d?q=80&w=400&auto=format&fit=crop' },
     ]
   },
   {
