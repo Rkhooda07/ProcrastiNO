@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, Pressable, Dimensions, Modal, ActivityIndicator, Animated, Platform, PanResponder, Alert } from 'react-native';
+import type { GestureResponderEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../constants/colors';
@@ -196,6 +197,9 @@ export default function WorkoutScreen() {
   const countdownScale = useRef(new Animated.Value(0)).current;
   const countdownOpacity = useRef(new Animated.Value(0)).current;
   const pan = useRef(new Animated.ValueXY()).current;
+  const previewTouchStartY = useRef(0);
+  const previewTouchOffsetY = useRef(0);
+  const previewTouchDragging = useRef(false);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -211,6 +215,7 @@ export default function WorkoutScreen() {
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 10 && Math.abs(gestureState.dx) < 30,
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => gestureState.dy > 10 && Math.abs(gestureState.dx) < 30,
       onPanResponderMove: (_, gestureState) => { if (gestureState.dy > 0) pan.y.setValue(gestureState.dy); },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dy > 150 || gestureState.vy > 0.5) {
@@ -250,6 +255,34 @@ export default function WorkoutScreen() {
         isExitingRef.current = false;
       }, 100);
     });
+  };
+
+  const handlePreviewTouchStart = (event: GestureResponderEvent) => {
+    previewTouchStartY.current = event.nativeEvent.pageY;
+    previewTouchOffsetY.current = 0;
+    previewTouchDragging.current = false;
+  };
+
+  const handlePreviewTouchMove = (event: GestureResponderEvent) => {
+    const offsetY = event.nativeEvent.pageY - previewTouchStartY.current;
+    if (offsetY <= 0) return;
+
+    previewTouchOffsetY.current = offsetY;
+    if (offsetY > 8) previewTouchDragging.current = true;
+    pan.y.setValue(offsetY);
+  };
+
+  const handlePreviewTouchEnd = () => {
+    if (!previewTouchDragging.current) return;
+
+    if (previewTouchOffsetY.current > 150) {
+      handleExitSession();
+    } else {
+      Animated.spring(pan.y, { toValue: 0, useNativeDriver: true, tension: 50, friction: 10 }).start();
+    }
+
+    previewTouchOffsetY.current = 0;
+    previewTouchDragging.current = false;
   };
 
   const startWorkout = (workout: Workout) => {
@@ -420,7 +453,14 @@ export default function WorkoutScreen() {
         <View style={styles.modalOverlay}>
           <Animated.View style={[styles.sessionContainer, { transform: [{ translateY: pan.y }] }]} {...panResponder.panHandlers}>
             {showResumePrompt ? (
-              <View style={styles.resumePromptContent}>
+              <View
+                style={styles.resumePromptContent}
+                {...panResponder.panHandlers}
+                onTouchStart={handlePreviewTouchStart}
+                onTouchMove={handlePreviewTouchMove}
+                onTouchEnd={handlePreviewTouchEnd}
+                onTouchCancel={handlePreviewTouchEnd}
+              >
                 <View style={styles.resumeCard}>
                   <View style={styles.resumeIconContainer}><Ionicons name="refresh-circle" size={60} color={colors.accent} /></View>
                   <Text style={styles.resumeTitle}>Resume?</Text>
@@ -432,7 +472,14 @@ export default function WorkoutScreen() {
                 </View>
               </View>
             ) : (
-              <SafeAreaView style={styles.workoutContent} edges={['top', 'left', 'right']}>
+              <SafeAreaView
+                style={styles.workoutContent}
+                edges={['top', 'left', 'right']}
+                onTouchStart={sessionStatus === 'preview' ? handlePreviewTouchStart : undefined}
+                onTouchMove={sessionStatus === 'preview' ? handlePreviewTouchMove : undefined}
+                onTouchEnd={sessionStatus === 'preview' ? handlePreviewTouchEnd : undefined}
+                onTouchCancel={sessionStatus === 'preview' ? handlePreviewTouchEnd : undefined}
+              >
                 {selectedWorkout && (
                   <>
                     <View style={styles.sessionHeader}>
@@ -447,7 +494,7 @@ export default function WorkoutScreen() {
                     </View>
 
                     {sessionStatus === 'preview' && (
-                      <View style={styles.previewContent}>
+                      <View style={styles.previewContent} {...panResponder.panHandlers}>
                         <Image source={{ uri: selectedWorkout.image }} style={styles.previewImage} />
                         <Text style={styles.previewTitle}>Get Ready!</Text>
                         <Text style={styles.previewDescription}>{selectedWorkout.description}</Text>
