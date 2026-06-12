@@ -5,12 +5,11 @@ import {
   Easing,
   Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../lib/supabase';
@@ -22,17 +21,10 @@ WebBrowser.maybeCompleteAuthSession();
 const LOGO = require('../assets/Logo.png');
 
 export default function Login() {
-  const { session, _hasHydrated } = useUserStore();
-  const router = useRouter();
+  const { _hasHydrated } = useUserStore();
   const [isLoading, setIsLoading] = useState(false);
   const entrance = useRef(new Animated.Value(0)).current;
   const pressScale = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (_hasHydrated && session) {
-      router.replace('/tasks');
-    }
-  }, [_hasHydrated, session]);
 
   useEffect(() => {
     Animated.timing(entrance, {
