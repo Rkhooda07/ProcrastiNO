@@ -2,25 +2,19 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
-
-// Fixed IDs for the 2 users (MUST be valid UUIDs for Supabase)
-export const RAKSHIT_ID = '8b693895-7145-4202-8692-06992f7682f6';
-export const SNEH_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+import { Session, User } from '@supabase/supabase-js';
 
 interface UserState {
-  currentUserId: string | null;
-  currentUserName: string | null;
-  partnerId: string | null;
-  partnerName: string | null;
+  session: Session | null;
+  user: User | null;
   profilePics: Record<string, string>; // { [userId]: uri }
-  hasChosenUser: boolean;
   _hasHydrated: boolean;
-  setUser: (id: string) => Promise<void>;
+  setSession: (session: Session | null) => void;
   setProfilePic: (userId: string, uri: string) => void;
   fetchProfilePics: (userIds: string[]) => Promise<void>;
   uploadProfilePic: (userId: string, uri: string, mimeType?: string | null) => Promise<void>;
   subscribeToProfilePics: (userIds: string[]) => () => void;
-  resetUser: () => void;
+  signOut: () => Promise<void>;
   setHasHydrated: (state: boolean) => void;
 }
 
@@ -54,34 +48,22 @@ function mergeProfilePics(
 export const useUserStore = create<UserState>()(
   persist(
     (set) => ({
-      currentUserId: null,
-      currentUserName: null,
-      partnerId: null,
-      partnerName: null,
+      session: null,
+      user: null,
       profilePics: {},
-      hasChosenUser: false,
       _hasHydrated: false,
-      setUser: async (id: string) => {
-        const isRakshit = id === RAKSHIT_ID;
-        const currentUserName = isRakshit ? 'Rakshit' : 'Sneh';
-        const partnerId = isRakshit ? SNEH_ID : RAKSHIT_ID;
-        const partnerName = isRakshit ? 'Sneh' : 'Rakshit';
-
+      setSession: (session) => {
         set({ 
-          currentUserId: id, 
-          currentUserName, 
-          partnerId, 
-          partnerName, 
-          hasChosenUser: true 
+          session, 
+          user: session?.user ?? null,
         });
 
-        // Seed stats in the background so profile selection feels instant.
-        void Promise.all([
-          supabase.from('user_stats').upsert({ user_id: id }, { onConflict: 'user_id' }),
-          supabase.from('user_stats').upsert({ user_id: partnerId }, { onConflict: 'user_id' }),
-        ]).catch((error) => {
-          console.warn('Failed to seed user stats', error);
-        });
+        if (session?.user) {
+          // Seed stats for the logged in user
+          void supabase.from('user_stats').upsert({ user_id: session.user.id }, { onConflict: 'user_id' }).catch((error) => {
+            console.warn('Failed to seed user stats', error);
+          });
+        }
       },
       setProfilePic: (userId, uri) => {
         set((state) => ({
@@ -176,19 +158,17 @@ export const useUserStore = create<UserState>()(
           void supabase.removeChannel(channel);
         };
       },
-      resetUser: () => {
+      signOut: async () => {
+        await supabase.auth.signOut();
         set({ 
-          currentUserId: null, 
-          currentUserName: null, 
-          partnerId: null, 
-          partnerName: null, 
-          hasChosenUser: false 
+          session: null, 
+          user: null,
         });
       },
       setHasHydrated: (state) => set({ _hasHydrated: state }),
     }),
     {
-      name: 'user-storage-v2', // Changed from 'user-storage' to force a clean slate
+      name: 'user-storage-v3', // Incremented version
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

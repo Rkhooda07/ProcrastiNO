@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Slot, useRouter, useSegments, useRootNavigationState } from 'expo-router';
-import { RAKSHIT_ID, SNEH_ID, useUserStore } from '../store/userStore';
+import { useUserStore } from '../store/userStore';
 import { StatusBar } from 'expo-status-bar';
 import {
   addNotificationResponseListener,
@@ -8,9 +8,10 @@ import {
   getLastNotificationResponseAsync,
 } from '../lib/notifications';
 import { useReminderStore } from '../store/reminderStore';
+import { supabase } from '../lib/supabase';
 
 export default function RootLayout() {
-  const { hasChosenUser, _hasHydrated, currentUserId, resetUser } = useUserStore();
+  const { session, _hasHydrated, setSession } = useUserStore();
   const segments = useSegments();
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
@@ -19,43 +20,50 @@ export default function RootLayout() {
   const subscribeToProfilePics = useUserStore((state) => state.subscribeToProfilePics);
 
   useEffect(() => {
-    if (!_hasHydrated || !rootNavigationState?.key) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
 
-    // Force reset if the ID is not a valid UUID (must be 36 characters)
-    // This wipes out the old "rakshit-id" and "sneh-id" strings permanently
-    if (hasChosenUser && currentUserId && currentUserId.length !== 36) {
-      resetUser();
-      return;
-    }
-
-    const isSelectionPage = segments[0] === 'select-user';
-
-    if (!hasChosenUser && !isSelectionPage) {
-      router.replace('/select-user');
-    } else if (hasChosenUser && isSelectionPage) {
-      router.replace('/tasks');
-    }
-  }, [hasChosenUser, segments, _hasHydrated, rootNavigationState?.key]);
+    supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+  }, []);
 
   useEffect(() => {
-    if (!currentUserId) return;
+    if (!_hasHydrated || !rootNavigationState?.key) return;
+
+    const isAuthenticated = !!session;
+    const isAuthGroup = segments[0] === '(auth)'; // Assuming we might put login in an (auth) group, or just check if it's not the main app
+    const isLoginPage = segments[0] === 'login' || segments[0] === 'index' && !isAuthenticated;
+
+    if (!isAuthenticated && !isLoginPage) {
+      // Redirect to login if not authenticated
+      router.replace('/');
+    } else if (isAuthenticated && (segments[0] === 'login' || segments.length === 0 || segments[0] === 'index')) {
+      // Redirect to tasks if authenticated and on a login/root page
+      router.replace('/tasks');
+    }
+  }, [session, segments, _hasHydrated, rootNavigationState?.key]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
 
     void ensureNotificationsReadyAsync().catch((error) => {
       console.warn('Failed to initialize notifications', error);
     });
 
-    void fetchReminderSettings(currentUserId).catch((error) => {
+    void fetchReminderSettings(session.user.id).catch((error) => {
       console.warn('Failed to hydrate reminder settings', error);
     });
-  }, [currentUserId, fetchReminderSettings]);
+  }, [session?.user?.id, fetchReminderSettings]);
 
   useEffect(() => {
-    if (!_hasHydrated) return;
+    if (!_hasHydrated || !session?.user?.id) return;
 
-    const profileIds = [RAKSHIT_ID, SNEH_ID];
+    const profileIds = [session.user.id];
     void fetchProfilePics(profileIds);
     return subscribeToProfilePics(profileIds);
-  }, [_hasHydrated, fetchProfilePics, subscribeToProfilePics]);
+  }, [_hasHydrated, session?.user?.id, fetchProfilePics, subscribeToProfilePics]);
 
   useEffect(() => {
     if (!rootNavigationState?.key) return;

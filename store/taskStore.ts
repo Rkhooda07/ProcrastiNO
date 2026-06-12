@@ -19,13 +19,13 @@ interface TaskState {
   isLoading: boolean;
   completedDates: string[]; 
   pendingSync: Set<string>; 
-  fetchTasks: (userId: string, pairUserId: string | null) => Promise<void>;
+  fetchTasks: (userId: string) => Promise<void>;
   toggleTask: (taskId: string, isDone: boolean) => Promise<void>;
   addTask: (title: string, ownerId: string) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
   makeRecurring: (taskId: string, recurring: boolean) => Promise<void>;
   fetchStreakData: (userId: string) => Promise<void>;
-  subscribeToTasks: (userId: string, pairUserId: string | null) => () => void;
+  subscribeToTasks: (userId: string) => () => void;
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -33,22 +33,16 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   isLoading: false,
   completedDates: [],
   pendingSync: new Set(),
-  fetchTasks: async (userId, pairUserId) => {
+  fetchTasks: async (userId) => {
     set({ isLoading: true });
     const today = new Date().toISOString().split('T')[0];
-    
-    let query = supabase
+
+    const { data } = await supabase
       .from('tasks')
       .select('*')
+      .eq('owner_id', userId)
       .or(`date.eq.${today},is_recurring.eq.true`);
 
-    if (pairUserId) {
-      query = query.or(`owner_id.eq.${userId},owner_id.eq.${pairUserId}`);
-    } else {
-      query = query.eq('owner_id', userId);
-    }
-
-    const { data } = await query;
     if (data) {
       set({ tasks: data, isLoading: false });
     } else {
@@ -103,7 +97,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   addTask: async (title, ownerId) => {
     const today = new Date().toISOString().split('T')[0];
     const realId = uuidv4(); // Generate real UUID on client
-    
+
     const newTask: Task = {
       id: realId,
       owner_id: ownerId,
@@ -136,7 +130,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     set((state) => ({ tasks: state.tasks.filter(t => t.id !== taskId) }));
     await supabase.from('tasks').delete().eq('id', taskId);
   },
-  subscribeToTasks: (userId, pairUserId) => {
+  subscribeToTasks: (userId) => {
     const today = new Date().toISOString().split('T')[0];
     const channel = supabase
       .channel('tasks-realtime')
@@ -148,7 +142,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           const oldTask = payload.old as { id: string };
           if (get().pendingSync.has(newTask?.id || oldTask?.id)) return;
           if (payload.eventType === 'INSERT') {
-             if (newTask.owner_id === userId || newTask.owner_id === pairUserId) {
+             if (newTask.owner_id === userId) {
                 set((state) => {
                   if (state.tasks.some(t => t.id === newTask.id)) return state;
                   return { tasks: [...state.tasks, newTask] };

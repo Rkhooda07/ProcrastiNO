@@ -8,7 +8,8 @@ import { useReminderStore } from '../../../store/reminderStore';
 import { colors } from '../../../constants/colors';
 
 export default function RemindersScreen() {
-  const { currentUserId } = useUserStore();
+  const { user } = useUserStore();
+  const currentUserId = user?.id;
   const { settings, isLoading, fetchSettings, updateSettings } = useReminderStore();
   const router = useRouter();
 
