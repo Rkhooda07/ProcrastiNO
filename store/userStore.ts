@@ -60,9 +60,15 @@ export const useUserStore = create<UserState>()(
 
         if (session?.user) {
           // Seed stats for the logged in user
-          void supabase.from('user_stats').upsert({ user_id: session.user.id }, { onConflict: 'user_id' }).catch((error) => {
-            console.warn('Failed to seed user stats', error);
-          });
+          void (async () => {
+            const { error } = await supabase
+              .from('user_stats')
+              .upsert({ user_id: session.user.id }, { onConflict: 'user_id' });
+
+            if (error) {
+              console.warn('Failed to seed user stats', error);
+            }
+          })();
         }
       },
       setProfilePic: (userId, uri) => {

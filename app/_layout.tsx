@@ -24,25 +24,32 @@ export default function RootLayout() {
       setSession(session);
     });
 
-    supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
     if (!_hasHydrated || !rootNavigationState?.key) return;
 
     const isAuthenticated = !!session;
-    const isAuthGroup = segments[0] === '(auth)'; // Assuming we might put login in an (auth) group, or just check if it's not the main app
-    const isLoginPage = segments[0] === 'login' || segments[0] === 'index' && !isAuthenticated;
+    const firstSegment = segments[0] as string | undefined;
+    const isLoginPage = firstSegment === undefined || firstSegment === 'index';
 
-    if (!isAuthenticated && !isLoginPage) {
-      // Redirect to login if not authenticated
-      router.replace('/');
-    } else if (isAuthenticated && (segments[0] === 'login' || segments.length === 0 || segments[0] === 'index')) {
-      // Redirect to tasks if authenticated and on a login/root page
-      router.replace('/tasks');
-    }
+    // Use a small delay to ensure navigation is ready and avoid state updates during render
+    const timer = setTimeout(() => {
+      if (!isAuthenticated && !isLoginPage) {
+        router.replace('/');
+      } else if (isAuthenticated && isLoginPage) {
+        router.replace('/tasks');
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [session, segments, _hasHydrated, rootNavigationState?.key]);
 
   useEffect(() => {
