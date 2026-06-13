@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useState, useRef, memo, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TextInput, Pressable, KeyboardAvoidingView, Platform, Modal, Animated, Keyboard } from 'react-native';
-import { useUserStore, RAKSHIT_ID, SNEH_ID } from '../../store/userStore';
+import { useUserStore } from '../../store/userStore';
 import { useTaskStore, Task } from '../../store/taskStore';
 import { TaskItem } from '../../components/TaskItem';
 import { colors } from '../../constants/colors';
-import { Pager } from '../../components/Pager';
-import { supabase } from '../../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -189,16 +187,13 @@ const TaskList = memo(({
 });
 
 export default function TasksScreen() {
-  const { currentUserId, partnerId, currentUserName, partnerName } = useUserStore();
+  const { currentUserId, currentUserName } = useUserStore();
   const { tasks = [], isLoading, completedDates = [], fetchTasks, toggleTask, addTask, deleteTask, makeRecurring, subscribeToTasks } = useTaskStore();
-  const [currentPage, setCurrentPage] = useState(0);
   const [focusedTask, setFocusedTask] = useState<Task | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
-  const pagerRef = useRef<any>(null);
   const navigation = useNavigation();
   const popAnim = useRef(new Animated.Value(0)).current;
   const myTasks = tasks.filter((t) => t.owner_id === currentUserId);
-  const friendTasks = tasks.filter((t) => t.owner_id === partnerId);
   const myTasksReminderKey = useMemo(
     () =>
       myTasks
@@ -256,11 +251,11 @@ export default function TasksScreen() {
 
   useEffect(() => {
     if (currentUserId) {
-      fetchTasks(currentUserId, partnerId);
-      const unsubscribe = subscribeToTasks(currentUserId, partnerId);
+      fetchTasks(currentUserId, null);
+      const unsubscribe = subscribeToTasks(currentUserId, null);
       return () => unsubscribe();
     }
-  }, [currentUserId, partnerId]);
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -310,40 +305,17 @@ export default function TasksScreen() {
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
-        <View style={styles.indicatorContainer}>
-          <View style={[styles.indicator, currentPage === 0 && styles.indicatorActive]} />
-          <View style={[styles.indicator, currentPage === 1 && styles.indicatorActive]} />
+        <View style={styles.page}>
+          <TaskList
+            data={myTasks}
+            isOwner={true}
+            title="My Tasks"
+            ownerId={currentUserId || ''}
+            onToggle={toggleTask}
+            onAdd={handleAddTask}
+            onLongPress={setFocusedTask}
+          />
         </View>
-        
-        <Pager
-          ref={pagerRef}
-          style={styles.pagerView}
-          initialPage={0}
-          onPageSelected={(e) => setCurrentPage(e.nativeEvent.position)}
-        >
-          <View key="1" style={styles.page}>
-            <TaskList 
-              data={myTasks} 
-              isOwner={true} 
-              title="My Tasks" 
-              ownerId={currentUserId || ''} 
-              onToggle={toggleTask}
-              onAdd={handleAddTask}
-              onLongPress={setFocusedTask}
-            />
-          </View>
-          <View key="2" style={styles.page}>
-            <TaskList 
-              data={friendTasks} 
-              isOwner={false} 
-              title={`${partnerName || 'Partner'}'s Tasks`} 
-              ownerId={partnerId || ''} 
-              onToggle={toggleTask}
-              onAdd={handleAddTask}
-              onLongPress={setFocusedTask}
-            />
-          </View>
-        </Pager>
       </KeyboardAvoidingView>
 
       <Modal
@@ -482,9 +454,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.background,
   },
-  pagerView: {
-    flex: 1,
-  },
   page: {
     flex: 1,
     paddingHorizontal: 24,
@@ -563,23 +532,6 @@ const styles = StyleSheet.create({
   },
   addBtnSmall: {
     marginLeft: 8,
-  },
-  indicatorContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  indicator: {
-    width: 24,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    marginHorizontal: 4,
-  },
-  indicatorActive: {
-    backgroundColor: colors.accent,
-    width: 32,
   },
   overlay: {
     flex: 1,
