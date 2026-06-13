@@ -205,17 +205,32 @@ const PremiumTabButton = memo(function PremiumTabButton({
   );
 });
 
+import { Easing, InteractionManager } from 'react-native';
+import { useJournalStore } from '../../store/journalStore';
+
+// Memoized Calendar for zero-lag month switching
+const MemoizedCalendar = memo(({ markedDates, theme, style }: any) => (
+  <Calendar
+    enableSwipeMonths={true}
+    theme={theme}
+    markedDates={markedDates}
+    style={style}
+    hideExtraDays={true}
+    disableMonthChange={false}
+  />
+));
+
 function HeaderActions({ showProfile = true }: { showProfile?: boolean }) {
   const router = useRouter();
-  const { currentUserId, currentUserName } = useUserStore();
-  const { completedDates, fetchStreakData } = useTaskStore();
+  const { currentUserName } = useUserStore();
+  const { streak, activeDates } = useJournalStore();
   const [showCalendar, setShowCalendar] = useState(false);
+  const popoverAnim = useRef(new Animated.Value(0)).current;
 
-  const currentStreak = useMemo(() => calculateStreak(completedDates), [completedDates]);
-
+  // Pre-calculate marked dates for instant rendering
   const markedDates = useMemo(() => {
     const dates: Record<string, any> = {};
-    completedDates.forEach((date) => {
+    activeDates.forEach((date) => {
       dates[date] = {
         selected: true,
         selectedColor: colors.accentMint,
@@ -223,26 +238,62 @@ function HeaderActions({ showProfile = true }: { showProfile?: boolean }) {
       };
     });
     return dates;
-  }, [completedDates]);
+  }, [activeDates]);
 
-  useEffect(() => {
-    if (currentUserId) {
-      void fetchStreakData(currentUserId);
+  const toggleCalendar = () => {
+    if (showCalendar) {
+      Animated.timing(popoverAnim, {
+        toValue: 0,
+        duration: 120,
+        useNativeDriver: true,
+      }).start(() => setShowCalendar(false));
+    } else {
+      setShowCalendar(true);
+      // Removed InteractionManager to render everything at once
+      Animated.spring(popoverAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        stiffness: 1800, // Extremely snappy
+        damping: 100,
+        mass: 0.8,
+      }).start();
     }
-  }, [currentUserId, fetchStreakData]);
+  };
+
+  const calendarTheme = useMemo(() => ({
+    backgroundColor: '#ffffff',
+    calendarBackground: '#ffffff',
+    textSectionTitleColor: '#b6c1cd',
+    selectedDayBackgroundColor: colors.accentMint,
+    selectedDayTextColor: '#ffffff',
+    todayTextColor: colors.accent,
+    dayTextColor: '#2d4150',
+    textDisabledColor: '#d9e1e8',
+    dotColor: colors.accentMint,
+    selectedDotColor: '#ffffff',
+    arrowColor: colors.accent,
+    monthTextColor: colors.textPrimary,
+    textDayFontWeight: '600',
+    textMonthFontWeight: 'bold',
+    textDayHeaderFontWeight: '500',
+    textDayFontSize: 14,
+    textMonthFontSize: 16,
+    textDayHeaderFontSize: 12,
+  }), []);
 
   return (
     <View style={styles.headerActions}>
       <Pressable
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setShowCalendar(true);
-        }}
-        style={styles.streakButton}
+        onPress={toggleCalendar}
+        style={({ pressed }) => [
+          styles.streakButton,
+          { opacity: pressed ? 0.7 : 1 }
+        ]}
       >
-        <Text style={styles.streakButtonText}>{currentStreak}</Text>
+        <Text style={styles.streakButtonText}>{streak}</Text>
         <Ionicons name="flame" size={26} color={colors.streakOrange} />
       </Pressable>
+      
       {showProfile && (
         <Pressable
           onPress={() => {
@@ -255,52 +306,53 @@ function HeaderActions({ showProfile = true }: { showProfile?: boolean }) {
         </Pressable>
       )}
 
-      <Modal
-        visible={showCalendar}
-        transparent={true}
-        animationType="none"
-        onRequestClose={() => setShowCalendar(false)}
-      >
-        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill}>
-          <Pressable style={styles.overlay} onPress={() => setShowCalendar(false)}>
-            <View style={styles.calendarContainer}>
-              <View style={styles.calendarHeader}>
-                <Ionicons name="flame" size={32} color={colors.streakOrange} />
-                <Text style={styles.calendarTitle}>{currentStreak} Day Streak!</Text>
-                <Text style={styles.calendarSubtitle}>Keep it up, {currentUserName}!</Text>
+      {showCalendar && (
+        <Modal
+          visible={showCalendar}
+          transparent={true}
+          animationType="none"
+          onRequestClose={toggleCalendar}
+          hardwareAccelerated={true}
+        >
+          <Pressable style={styles.modalOverlay} onPress={toggleCalendar}>
+            <Animated.View
+              style={[
+                styles.popoverContainer,
+                {
+                  opacity: popoverAnim,
+                  transform: [
+                    {
+                      scale: popoverAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.97, 1],
+                      }),
+                    },
+                    {
+                      translateY: popoverAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-8, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <View style={styles.popoverArrow} />
+              <View style={styles.popoverContent}>
+                <View style={styles.popoverHeader}>
+                   <Text style={styles.popoverTitle}>{streak} Day Streak!</Text>
+                   <Text style={styles.popoverSubtitle}>Keep it up, {currentUserName}!</Text>
+                </View>
+                <MemoizedCalendar
+                  markedDates={markedDates}
+                  theme={calendarTheme}
+                  style={styles.popoverCalendar}
+                />
               </View>
-              <Calendar
-                enableSwipeMonths={true}
-                theme={{
-                  backgroundColor: '#ffffff',
-                  calendarBackground: '#ffffff',
-                  textSectionTitleColor: '#b6c1cd',
-                  selectedDayBackgroundColor: colors.accentMint,
-                  selectedDayTextColor: '#ffffff',
-                  todayTextColor: colors.accent,
-                  dayTextColor: '#2d4150',
-                  textDisabledColor: '#d9e1e8',
-                  dotColor: colors.accentMint,
-                  selectedDotColor: '#ffffff',
-                  arrowColor: colors.accent,
-                  monthTextColor: colors.textPrimary,
-                  textDayFontWeight: '600',
-                  textMonthFontWeight: 'bold',
-                  textDayHeaderFontWeight: '500',
-                  textDayFontSize: 16,
-                  textMonthFontSize: 18,
-                  textDayHeaderFontSize: 13,
-                }}
-                markedDates={markedDates}
-                style={styles.calendar}
-              />
-              <Pressable style={styles.closeBtn} onPress={() => setShowCalendar(false)}>
-                <Text style={styles.closeBtnText}>Close</Text>
-              </Pressable>
-            </View>
+            </Animated.View>
           </Pressable>
-        </BlurView>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -514,52 +566,54 @@ const styles = StyleSheet.create({
     padding: 6,
     marginLeft: 2,
   },
-  overlay: {
+  modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'transparent',
   },
-  calendarContainer: {
-    backgroundColor: '#FFF',
+  popoverContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 100 : 80,
+    right: 20,
     width: width - 40,
-    borderRadius: 32,
-    padding: 20,
-    alignItems: 'center',
+    maxWidth: 340,
+    backgroundColor: '#FFF',
+    borderRadius: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.2,
-    shadowRadius: 40,
-    elevation: 20,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
   },
-  calendarHeader: {
+  popoverArrow: {
+    position: 'absolute',
+    top: -10,
+    right: 55,
+    width: 20,
+    height: 20,
+    backgroundColor: '#FFF',
+    transform: [{ rotate: '45deg' }],
+    borderRadius: 4,
+  },
+  popoverContent: {
+    padding: 16,
+    overflow: 'hidden',
+    borderRadius: 24,
+  },
+  popoverHeader: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
   },
-  calendarTitle: {
-    fontSize: 24,
+  popoverTitle: {
+    fontSize: 18,
     fontWeight: '800',
     color: colors.textPrimary,
-    marginTop: 8,
   },
-  calendarSubtitle: {
-    fontSize: 14,
+  popoverSubtitle: {
+    fontSize: 12,
     color: colors.textSecondary,
-    marginTop: 4,
+    marginTop: 2,
   },
-  calendar: {
-    width: width - 80,
-    borderRadius: 16,
-  },
-  closeBtn: {
-    marginTop: 24,
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    backgroundColor: colors.background,
-    borderRadius: 16,
-  },
-  closeBtnText: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
+  popoverCalendar: {
+    borderRadius: 12,
   },
 });
