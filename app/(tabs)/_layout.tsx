@@ -1,17 +1,26 @@
-import React, { memo, useEffect, useRef } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Tabs, useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Animated,
+  Dimensions,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
+  Text,
   View,
   type PressableProps,
   type PressableStateCallbackType,
 } from 'react-native';
+import { Calendar } from 'react-native-calendars';
+import * as Haptics from 'expo-haptics';
+import { useTaskStore } from '../../store/taskStore';
+import { useUserStore } from '../../store/userStore';
 import { colors } from '../../constants/colors';
+
+const { width } = Dimensions.get('window');
 
 type TabIconName = keyof typeof Ionicons.glyphMap;
 
@@ -22,6 +31,34 @@ type PremiumTabButtonProps = PressableProps & {
   activeIcon: TabIconName;
   inactiveIcon: TabIconName;
   accentColor: string;
+};
+
+const calculateStreak = (dates: string[]) => {
+  if (!dates || dates.length === 0) return 0;
+  const sorted = [...new Set(dates)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const todayStr = today.toISOString().split('T')[0];
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  if (sorted[0] !== todayStr && sorted[0] !== yesterdayStr) return 0;
+  let streak = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const d = new Date(sorted[i]);
+    if (i === 0) {
+      streak = 1;
+    } else {
+      const prev = new Date(sorted[i - 1]);
+      prev.setDate(prev.getDate() - 1);
+      if (d.toISOString().split('T')[0] === prev.toISOString().split('T')[0]) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+  }
+  return streak;
 };
 
 const PremiumTabButton = memo(function PremiumTabButton({
@@ -168,16 +205,103 @@ const PremiumTabButton = memo(function PremiumTabButton({
   );
 });
 
-function HeaderProfileButton() {
+function HeaderActions({ showProfile = true }: { showProfile?: boolean }) {
   const router = useRouter();
+  const { currentUserId, currentUserName } = useUserStore();
+  const { completedDates, fetchStreakData } = useTaskStore();
+  const [showCalendar, setShowCalendar] = useState(false);
+
+  const currentStreak = useMemo(() => calculateStreak(completedDates), [completedDates]);
+
+  const markedDates = useMemo(() => {
+    const dates: Record<string, any> = {};
+    completedDates.forEach((date) => {
+      dates[date] = {
+        selected: true,
+        selectedColor: colors.accentMint,
+        customStyles: { container: { borderRadius: 8 } },
+      };
+    });
+    return dates;
+  }, [completedDates]);
+
+  useEffect(() => {
+    if (currentUserId) {
+      void fetchStreakData(currentUserId);
+    }
+  }, [currentUserId, fetchStreakData]);
 
   return (
-    <Pressable
-      onPress={() => router.navigate('/profile')}
-      style={styles.headerProfileButton}
-    >
-      <Ionicons name="person-circle" size={30} color={colors.accentMint} />
-    </Pressable>
+    <View style={styles.headerActions}>
+      <Pressable
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowCalendar(true);
+        }}
+        style={styles.streakButton}
+      >
+        <Text style={styles.streakButtonText}>{currentStreak}</Text>
+        <Ionicons name="flame" size={26} color={colors.streakOrange} />
+      </Pressable>
+      {showProfile && (
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.navigate('/profile');
+          }}
+          style={styles.headerProfileButton}
+        >
+          <Ionicons name="person-circle" size={30} color={colors.accentMint} />
+        </Pressable>
+      )}
+
+      <Modal
+        visible={showCalendar}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setShowCalendar(false)}
+      >
+        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill}>
+          <Pressable style={styles.overlay} onPress={() => setShowCalendar(false)}>
+            <View style={styles.calendarContainer}>
+              <View style={styles.calendarHeader}>
+                <Ionicons name="flame" size={32} color={colors.streakOrange} />
+                <Text style={styles.calendarTitle}>{currentStreak} Day Streak!</Text>
+                <Text style={styles.calendarSubtitle}>Keep it up, {currentUserName}!</Text>
+              </View>
+              <Calendar
+                enableSwipeMonths={true}
+                theme={{
+                  backgroundColor: '#ffffff',
+                  calendarBackground: '#ffffff',
+                  textSectionTitleColor: '#b6c1cd',
+                  selectedDayBackgroundColor: colors.accentMint,
+                  selectedDayTextColor: '#ffffff',
+                  todayTextColor: colors.accent,
+                  dayTextColor: '#2d4150',
+                  textDisabledColor: '#d9e1e8',
+                  dotColor: colors.accentMint,
+                  selectedDotColor: '#ffffff',
+                  arrowColor: colors.accent,
+                  monthTextColor: colors.textPrimary,
+                  textDayFontWeight: '600',
+                  textMonthFontWeight: 'bold',
+                  textDayHeaderFontWeight: '500',
+                  textDayFontSize: 16,
+                  textMonthFontSize: 18,
+                  textDayHeaderFontSize: 13,
+                }}
+                markedDates={markedDates}
+                style={styles.calendar}
+              />
+              <Pressable style={styles.closeBtn} onPress={() => setShowCalendar(false)}>
+                <Text style={styles.closeBtnText}>Close</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </BlurView>
+      </Modal>
+    </View>
   );
 }
 
@@ -225,7 +349,7 @@ export default function TabLayout() {
           fontWeight: '700',
           color: colors.textPrimary,
         },
-        headerRight: () => <HeaderProfileButton />,
+        headerRight: () => <HeaderActions />,
       }}
     >
       <Tabs.Screen
@@ -296,7 +420,7 @@ export default function TabLayout() {
         options={{
           href: null,
           title: 'Profile',
-          headerRight: () => null,
+          headerRight: () => <HeaderActions showProfile={false} />,
         }}
       />
       <Tabs.Screen
@@ -370,8 +494,72 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 999,
   },
+  headerActions: {
+    marginRight: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  streakButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  streakButtonText: {
+    marginRight: 4,
+    fontWeight: '800',
+    color: colors.streakOrange,
+    fontSize: 17,
+  },
   headerProfileButton: {
     padding: 6,
-    marginRight: 12,
+    marginLeft: 2,
+  },
+  overlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  calendarContainer: {
+    backgroundColor: '#FFF',
+    width: width - 40,
+    borderRadius: 32,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.2,
+    shadowRadius: 40,
+    elevation: 20,
+  },
+  calendarHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  calendarTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginTop: 8,
+  },
+  calendarSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  calendar: {
+    width: width - 80,
+    borderRadius: 16,
+  },
+  closeBtn: {
+    marginTop: 24,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    backgroundColor: colors.background,
+    borderRadius: 16,
+  },
+  closeBtnText: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

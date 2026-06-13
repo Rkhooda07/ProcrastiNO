@@ -8,39 +8,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
-import { Calendar } from 'react-native-calendars';
-import { useNavigation, useRouter } from 'expo-router';
 import { scheduleTaskReminderNotificationsAsync } from '../../lib/notifications';
 
 const { width, height } = Dimensions.get('window');
-
-const calculateStreak = (dates: string[]) => {
-  if (!dates || dates.length === 0) return 0;
-  const sorted = [...new Set(dates)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const todayStr = today.toISOString().split('T')[0];
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
-  if (sorted[0] !== todayStr && sorted[0] !== yesterdayStr) return 0;
-  let streak = 0;
-  for (let i = 0; i < sorted.length; i++) {
-    const d = new Date(sorted[i]);
-    if (i === 0) {
-      streak = 1;
-    } else {
-      const prev = new Date(sorted[i-1]);
-      prev.setDate(prev.getDate() - 1);
-      if (d.toISOString().split('T')[0] === prev.toISOString().split('T')[0]) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-  }
-  return streak;
-};
 
 const TaskList = memo(({ 
   data = [], 
@@ -188,11 +158,8 @@ const TaskList = memo(({
 
 export default function TasksScreen() {
   const { currentUserId, currentUserName } = useUserStore();
-  const { tasks = [], isLoading, completedDates = [], fetchTasks, toggleTask, addTask, deleteTask, makeRecurring, subscribeToTasks } = useTaskStore();
+  const { tasks = [], isLoading, fetchTasks, toggleTask, addTask, deleteTask, makeRecurring, subscribeToTasks } = useTaskStore();
   const [focusedTask, setFocusedTask] = useState<Task | null>(null);
-  const [showCalendar, setShowCalendar] = useState(false);
-  const navigation = useNavigation();
-  const router = useRouter();
   const popAnim = useRef(new Animated.Value(0)).current;
   const myTasks = tasks.filter((t) => t.owner_id === currentUserId);
   const myTasksReminderKey = useMemo(
@@ -203,50 +170,6 @@ export default function TasksScreen() {
         .join('|'),
     [myTasks]
   );
-
-  const currentStreak = useMemo(() => calculateStreak(completedDates), [completedDates]);
-  
-  const markedDates = useMemo(() => {
-    const dates: any = {};
-    completedDates.forEach(date => {
-      dates[date] = { 
-        selected: true, 
-        selectedColor: colors.accentMint,
-        customStyles: { container: { borderRadius: 8 } }
-      };
-    });
-    return dates;
-  }, [completedDates]);
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <View style={styles.headerActions}>
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setShowCalendar(true);
-            }}
-            style={styles.streakButton}
-          >
-            <Text style={styles.streakButtonText}>
-              {currentStreak}
-            </Text>
-            <Ionicons name="flame" size={26} color={colors.streakOrange} />
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.navigate('/profile');
-            }}
-            style={styles.profileHeaderButton}
-          >
-            <Ionicons name="person-circle" size={30} color={colors.accentMint} />
-          </Pressable>
-        </View>
-      ),
-    });
-  }, [currentStreak, router]);
 
   useEffect(() => {
     if (focusedTask) {
@@ -405,52 +328,6 @@ export default function TasksScreen() {
         </BlurView>
       </Modal>
 
-      <Modal
-        visible={showCalendar}
-        transparent={true}
-        animationType="none"
-        onRequestClose={() => setShowCalendar(false)}
-      >
-        <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill}>
-          <Pressable style={styles.overlay} onPress={() => setShowCalendar(false)}>
-            <View style={styles.calendarContainer}>
-              <View style={styles.calendarHeader}>
-                <Ionicons name="flame" size={32} color={colors.streakOrange} />
-                <Text style={styles.calendarTitle}>{currentStreak} Day Streak!</Text>
-                <Text style={styles.calendarSubtitle}>Keep it up, {currentUserName}!</Text>
-              </View>
-              <Calendar
-                enableSwipeMonths={true}
-                theme={{
-                  backgroundColor: '#ffffff',
-                  calendarBackground: '#ffffff',
-                  textSectionTitleColor: '#b6c1cd',
-                  selectedDayBackgroundColor: colors.accentMint,
-                  selectedDayTextColor: '#ffffff',
-                  todayTextColor: colors.accent,
-                  dayTextColor: '#2d4150',
-                  textDisabledColor: '#d9e1e8',
-                  dotColor: colors.accentMint,
-                  selectedDotColor: '#ffffff',
-                  arrowColor: colors.accent,
-                  monthTextColor: colors.textPrimary,
-                  textDayFontWeight: '600',
-                  textMonthFontWeight: 'bold',
-                  textDayHeaderFontWeight: '500',
-                  textDayFontSize: 16,
-                  textMonthFontSize: 18,
-                  textDayHeaderFontSize: 13
-                }}
-                markedDates={markedDates}
-                style={styles.calendar}
-              />
-              <Pressable style={styles.closeBtn} onPress={() => setShowCalendar(false)}>
-                <Text style={styles.closeBtnText}>Close</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </BlurView>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -469,26 +346,6 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
     paddingHorizontal: 24,
-  },
-  headerActions: {
-    marginRight: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  streakButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-  },
-  streakButtonText: {
-    marginRight: 4,
-    fontWeight: '800',
-    color: colors.streakOrange,
-    fontSize: 17,
-  },
-  profileHeaderButton: {
-    padding: 6,
-    marginLeft: 2,
   },
   headerSection: {
     marginTop: 10,
@@ -624,48 +481,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     marginLeft: 6,
-  },
-  calendarContainer: {
-    backgroundColor: '#FFF',
-    width: width - 40,
-    borderRadius: 32,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.2,
-    shadowRadius: 40,
-    elevation: 20,
-  },
-  calendarHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  calendarTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    marginTop: 8,
-  },
-  calendarSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  calendar: {
-    width: width - 80,
-    borderRadius: 16,
-  },
-  closeBtn: {
-    marginTop: 24,
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    backgroundColor: colors.background,
-    borderRadius: 16,
-  },
-  closeBtnText: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
   },
 });
