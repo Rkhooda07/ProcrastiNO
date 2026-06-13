@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState, useRef, memo, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TextInput, Pressable, KeyboardAvoidingView, Platform, Modal, Animated, Keyboard } from 'react-native';
-import { useUserStore } from '../../store/userStore';
+import { useUserStore, RAKSHIT_ID, SNEH_ID } from '../../store/userStore';
 import { useTaskStore, Task } from '../../store/taskStore';
 import { TaskItem } from '../../components/TaskItem';
 import { colors } from '../../constants/colors';
+import { Pager } from '../../components/Pager';
+import { supabase } from '../../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -12,7 +14,7 @@ import { Calendar } from 'react-native-calendars';
 import { useNavigation } from 'expo-router';
 import { scheduleTaskReminderNotificationsAsync } from '../../lib/notifications';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const calculateStreak = (dates: string[]) => {
   if (!dates || dates.length === 0) return 0;
@@ -72,8 +74,10 @@ const TaskList = memo(({
 
   const scrollToInput = useCallback(() => {
     clearScrollTimers();
+    // Start scrolling immediately
     scrollViewRef.current?.scrollToEnd({ animated: true });
     
+    // Series of staggered retries to catch the layout as the keyboard animates in
     scrollTimersRef.current = [50, 100, 200, 400, 600].map((delay) =>
       setTimeout(() => {
         requestAnimationFrame(() => {
@@ -87,6 +91,7 @@ const TaskList = memo(({
     const showSubscription = Keyboard.addListener(
       Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow',
       () => {
+        // Force scroll when keyboard appears, even if already focused
         scrollToInput();
       }
     );
@@ -111,6 +116,8 @@ const TaskList = memo(({
 
   const dynamicSpacerHeight = useMemo(() => {
     if (Platform.OS !== 'android' || !isInputFocused) return 0;
+    // With KeyboardAvoidingView behavior=undefined, the OS resizes the window.
+    // We just need a small buffer so the input isn't touching the keyboard edge.
     return 40; 
   }, [isInputFocused]);
 
@@ -182,16 +189,16 @@ const TaskList = memo(({
 });
 
 export default function TasksScreen() {
-  const { user } = useUserStore();
-  const currentUserId = user?.id;
+  const { currentUserId, partnerId, currentUserName, partnerName } = useUserStore();
   const { tasks = [], isLoading, completedDates = [], fetchTasks, toggleTask, addTask, deleteTask, makeRecurring, subscribeToTasks } = useTaskStore();
+  const [currentPage, setCurrentPage] = useState(0);
   const [focusedTask, setFocusedTask] = useState<Task | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
+  const pagerRef = useRef<any>(null);
   const navigation = useNavigation();
   const popAnim = useRef(new Animated.Value(0)).current;
-  
-  const myTasks = useMemo(() => tasks.filter((t) => t.owner_id === currentUserId), [tasks, currentUserId]);
-  
+  const myTasks = tasks.filter((t) => t.owner_id === currentUserId);
+  const friendTasks = tasks.filter((t) => t.owner_id === partnerId);
   const myTasksReminderKey = useMemo(
     () =>
       myTasks
@@ -249,22 +256,22 @@ export default function TasksScreen() {
 
   useEffect(() => {
     if (currentUserId) {
-      fetchTasks(currentUserId);
-      const unsubscribe = subscribeToTasks(currentUserId);
+      fetchTasks(currentUserId, partnerId);
+      const unsubscribe = subscribeToTasks(currentUserId, partnerId);
       return () => unsubscribe();
     }
-  }, [currentUserId]);
+  }, [currentUserId, partnerId]);
 
   useEffect(() => {
-    if (!currentUserId || !user?.user_metadata?.full_name) return;
+    if (!currentUserId) return;
 
     void scheduleTaskReminderNotificationsAsync({
-      ownerName: user.user_metadata.full_name.split(' ')[0],
+      ownerName: currentUserName,
       tasks: myTasks,
     }).catch((error) => {
       console.warn('Failed to schedule task reminders', error);
     });
-  }, [currentUserId, user?.user_metadata?.full_name, myTasksReminderKey]);
+  }, [currentUserId, currentUserName, myTasksReminderKey]);
 
   const handleAddTask = async (title: string, ownerId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -303,17 +310,40 @@ export default function TasksScreen() {
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
-        <View style={styles.page}>
-          <TaskList 
-            data={myTasks} 
-            isOwner={true} 
-            title="My Tasks" 
-            ownerId={currentUserId || ''} 
-            onToggle={toggleTask}
-            onAdd={handleAddTask}
-            onLongPress={setFocusedTask}
-          />
+        <View style={styles.indicatorContainer}>
+          <View style={[styles.indicator, currentPage === 0 && styles.indicatorActive]} />
+          <View style={[styles.indicator, currentPage === 1 && styles.indicatorActive]} />
         </View>
+        
+        <Pager
+          ref={pagerRef}
+          style={styles.pagerView}
+          initialPage={0}
+          onPageSelected={(e) => setCurrentPage(e.nativeEvent.position)}
+        >
+          <View key="1" style={styles.page}>
+            <TaskList 
+              data={myTasks} 
+              isOwner={true} 
+              title="My Tasks" 
+              ownerId={currentUserId || ''} 
+              onToggle={toggleTask}
+              onAdd={handleAddTask}
+              onLongPress={setFocusedTask}
+            />
+          </View>
+          <View key="2" style={styles.page}>
+            <TaskList 
+              data={friendTasks} 
+              isOwner={false} 
+              title={`${partnerName || 'Partner'}'s Tasks`} 
+              ownerId={partnerId || ''} 
+              onToggle={toggleTask}
+              onAdd={handleAddTask}
+              onLongPress={setFocusedTask}
+            />
+          </View>
+        </Pager>
       </KeyboardAvoidingView>
 
       <Modal
@@ -403,7 +433,7 @@ export default function TasksScreen() {
               <View style={styles.calendarHeader}>
                 <Ionicons name="flame" size={32} color={colors.streakOrange} />
                 <Text style={styles.calendarTitle}>{currentStreak} Day Streak!</Text>
-                <Text style={styles.calendarSubtitle}>Keep it up, {user?.user_metadata?.full_name?.split(' ')[0] || ''}!</Text>
+                <Text style={styles.calendarSubtitle}>Keep it up, {currentUserName}!</Text>
               </View>
               <Calendar
                 enableSwipeMonths={true}
@@ -451,6 +481,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.background,
+  },
+  pagerView: {
+    flex: 1,
   },
   page: {
     flex: 1,
@@ -530,6 +563,23 @@ const styles = StyleSheet.create({
   },
   addBtnSmall: {
     marginLeft: 8,
+  },
+  indicatorContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  indicator: {
+    width: 24,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    marginHorizontal: 4,
+  },
+  indicatorActive: {
+    backgroundColor: colors.accent,
+    width: 32,
   },
   overlay: {
     flex: 1,

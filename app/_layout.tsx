@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Slot, useRouter, useSegments, useRootNavigationState } from 'expo-router';
-import { useUserStore } from '../store/userStore';
+import { RAKSHIT_ID, SNEH_ID, useUserStore } from '../store/userStore';
 import { StatusBar } from 'expo-status-bar';
 import {
   addNotificationResponseListener,
@@ -8,10 +8,9 @@ import {
   getLastNotificationResponseAsync,
 } from '../lib/notifications';
 import { useReminderStore } from '../store/reminderStore';
-import { supabase } from '../lib/supabase';
 
 export default function RootLayout() {
-  const { session, _hasHydrated, setSession } = useUserStore();
+  const { hasChosenUser, _hasHydrated, currentUserId, resetUser } = useUserStore();
   const segments = useSegments();
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
@@ -20,57 +19,43 @@ export default function RootLayout() {
   const subscribeToProfilePics = useUserStore((state) => state.subscribeToProfilePics);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
     if (!_hasHydrated || !rootNavigationState?.key) return;
 
-    const isAuthenticated = !!session;
-    const firstSegment = segments[0] as string | undefined;
-    const isLoginPage = firstSegment === undefined || firstSegment === 'index';
+    // Force reset if the ID is not a valid UUID (must be 36 characters)
+    // This wipes out the old "rakshit-id" and "sneh-id" strings permanently
+    if (hasChosenUser && currentUserId && currentUserId.length !== 36) {
+      resetUser();
+      return;
+    }
 
-    // Use a small delay to ensure navigation is ready and avoid state updates during render
-    const timer = setTimeout(() => {
-      if (!isAuthenticated && !isLoginPage) {
-        router.replace('/');
-      } else if (isAuthenticated && isLoginPage) {
-        router.replace('/tasks');
-      }
-    }, 0);
+    const isSelectionPage = segments[0] === 'select-user';
 
-    return () => clearTimeout(timer);
-  }, [session, segments, _hasHydrated, rootNavigationState?.key]);
+    if (!hasChosenUser && !isSelectionPage) {
+      router.replace('/select-user');
+    } else if (hasChosenUser && isSelectionPage) {
+      router.replace('/tasks');
+    }
+  }, [hasChosenUser, segments, _hasHydrated, rootNavigationState?.key]);
 
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!currentUserId) return;
 
     void ensureNotificationsReadyAsync().catch((error) => {
       console.warn('Failed to initialize notifications', error);
     });
 
-    void fetchReminderSettings(session.user.id).catch((error) => {
+    void fetchReminderSettings(currentUserId).catch((error) => {
       console.warn('Failed to hydrate reminder settings', error);
     });
-  }, [session?.user?.id, fetchReminderSettings]);
+  }, [currentUserId, fetchReminderSettings]);
 
   useEffect(() => {
-    if (!_hasHydrated || !session?.user?.id) return;
+    if (!_hasHydrated) return;
 
-    const profileIds = [session.user.id];
+    const profileIds = [RAKSHIT_ID, SNEH_ID];
     void fetchProfilePics(profileIds);
     return subscribeToProfilePics(profileIds);
-  }, [_hasHydrated, session?.user?.id, fetchProfilePics, subscribeToProfilePics]);
+  }, [_hasHydrated, fetchProfilePics, subscribeToProfilePics]);
 
   useEffect(() => {
     if (!rootNavigationState?.key) return;

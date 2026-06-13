@@ -5,6 +5,7 @@ import { Link, useRouter } from 'expo-router';
 import { useUserStore } from '../../store/userStore';
 import { useTaskStore } from '../../store/taskStore';
 import { colors } from '../../constants/colors';
+import { supabase } from '../../lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -44,24 +45,41 @@ const calculateStreak = (dates: string[]) => {
 };
 
 export default function ProfileScreen() {
-  const { user, profilePics, uploadProfilePic, signOut } = useUserStore();
+  const { currentUserId, partnerId, currentUserName, partnerName, profilePics, uploadProfilePic } = useUserStore();
   const { tasks, completedDates, fetchStreakData } = useTaskStore();
+  const [partnerCompletedDates, setPartnerCompletedDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSavingPhoto, setIsSavingPhoto] = useState(false);
   const router = useRouter();
-
-  const currentUserId = user?.id;
-  const currentUserName = user?.user_metadata?.full_name?.split(' ')[0] || 'User';
 
   useEffect(() => {
     if (currentUserId) {
       loadData();
     }
-  }, [currentUserId]);
+  }, [currentUserId, partnerId]);
 
   async function loadData() {
     setLoading(true);
     await fetchStreakData(currentUserId!);
+    if (partnerId) {
+      const { data } = await supabase
+        .from('tasks')
+        .select('date, is_done')
+        .eq('owner_id', partnerId);
+
+      if (data) {
+        const datesGrouped: { [key: string]: { total: number, done: number } } = {};
+        data.forEach(t => {
+          if (!datesGrouped[t.date]) datesGrouped[t.date] = { total: 0, done: 0 };
+          datesGrouped[t.date].total++;
+          if (t.is_done) datesGrouped[t.date].done++;
+        });
+        const completed = Object.keys(datesGrouped).filter(d => 
+          datesGrouped[d].total > 0 && datesGrouped[d].total === datesGrouped[d].done
+        );
+        setPartnerCompletedDates(completed);
+      }
+    }
     setLoading(false);
   }
 
@@ -88,14 +106,15 @@ export default function ProfileScreen() {
   const myCompletedToday = myTasksToday.filter(t => t.is_done).length;
   const myProgress = myTasksToday.length > 0 ? myCompletedToday / myTasksToday.length : 0;
 
-  const myStreak = calculateStreak(completedDates);
-  const myPfp = currentUserId ? profilePics[currentUserId] : null;
+  const partnerTasksToday = tasks.filter(t => t.owner_id === partnerId);
+  const partnerCompletedToday = partnerTasksToday.filter(t => t.is_done).length;
+  const partnerProgress = partnerTasksToday.length > 0 ? partnerCompletedToday / partnerTasksToday.length : 0;
 
-  const handleSignOut = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await signOut();
-    router.replace('/');
-  };
+  const myStreak = calculateStreak(completedDates);
+  const partnerStreak = calculateStreak(partnerCompletedDates);
+
+  const myPfp = currentUserId ? profilePics[currentUserId] : null;
+  const partnerPfp = partnerId ? profilePics[partnerId] : null;
 
   if (loading) {
     return (
@@ -114,7 +133,7 @@ export default function ProfileScreen() {
       >
         <View style={styles.header}>
           <Pressable onPress={pickImage} style={styles.pfpContainer}>
-            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.accent }]}>
+            <View style={[styles.avatarPlaceholder, { backgroundColor: currentUserName === 'Rakshit' ? colors.accent : '#FFB7B2' }]}>
               {myPfp ? (
                 <Image source={{ uri: myPfp }} style={styles.pfpImage} />
               ) : (
@@ -147,6 +166,34 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Partner's Status</Text>
+          <View style={[styles.card, styles.partnerCard]}>
+            <View style={styles.partnerInfo}>
+              <View style={[styles.partnerAvatar, { backgroundColor: partnerName === 'Sneh' ? '#FFB7B2' : colors.accent }]}>
+                {partnerPfp ? (
+                   <Image source={{ uri: partnerPfp }} style={styles.partnerPfpImage} />
+                ) : (
+                  <Text style={styles.partnerAvatarText}>{partnerName?.charAt(0)}</Text>
+                )}
+              </View>
+              <View>
+                <Text style={styles.partnerName}>{partnerName}</Text>
+                <View style={styles.partnerStreakRow}>
+                  <Ionicons name="flame" size={14} color={colors.streakOrange} />
+                  <Text style={styles.partnerStreak}>{partnerStreak}-day streak</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.partnerProgressContainer}>
+               <Text style={styles.partnerProgressText}>{partnerCompletedToday}/{partnerTasksToday.length} done</Text>
+               <View style={styles.miniProgressBg}>
+                 <View style={[styles.miniProgressFill, { width: `${partnerProgress * 100}%` }]} />
+               </View>
+            </View>
+          </View>
+        </View>
+
         <View style={styles.menu}>
           <Link href="/profile/reminders" asChild>
             <Pressable style={styles.menuItem}>
@@ -160,11 +207,15 @@ export default function ProfileScreen() {
 
           <Pressable 
             style={[styles.menuItem, { borderBottomWidth: 0 }]} 
-            onPress={handleSignOut}
+            onPress={() => {
+              const { resetUser } = useUserStore.getState();
+              resetUser();
+              router.replace('/select-user');
+            }}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="log-out-outline" size={22} color={colors.accent} />
-              <Text style={[styles.menuItemText, { color: colors.accent }]}>Sign Out</Text>
+              <Ionicons name="swap-horizontal-outline" size={22} color={colors.accent} />
+              <Text style={[styles.menuItemText, { color: colors.accent }]}>Switch Profile</Text>
             </View>
           </Pressable>
         </View>
@@ -215,6 +266,11 @@ const styles = StyleSheet.create({
   pfpImage: {
     width: '100%',
     height: '100%',
+  },
+  partnerPfpImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
   },
   editBadge: {
     position: 'absolute',
@@ -302,6 +358,79 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: colors.accentMint,
     borderRadius: 6,
+  },
+  section: {
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginBottom: 16,
+    marginLeft: 4,
+    letterSpacing: -0.3,
+  },
+  partnerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  partnerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  partnerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    overflow: 'hidden',
+  },
+  partnerAvatarText: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  partnerName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  partnerStreakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  partnerStreak: {
+    fontSize: 13,
+    color: colors.streakOrange,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  partnerProgressContainer: {
+    alignItems: 'flex-end',
+    width: 100,
+  },
+  partnerProgressText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    marginBottom: 6,
+  },
+  miniProgressBg: {
+    width: '100%',
+    height: 6,
+    backgroundColor: colors.background,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  miniProgressFill: {
+    height: '100%',
+    backgroundColor: colors.accentMint,
+    borderRadius: 3,
   },
   menu: {
     backgroundColor: colors.surface,
