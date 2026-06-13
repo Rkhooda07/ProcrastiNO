@@ -21,11 +21,12 @@ const { width } = Dimensions.get('window');
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 export default function JournalScreen() {
-  const { entries, addEntry, streak } = useJournalStore();
+  const { entries, addEntry, streak, activeDates, markActive } = useJournalStore();
   const [todayNote, setTodayNote] = useState('');
   const [greeting, setGreeting] = useState('GOOD MORNING');
   
   useEffect(() => {
+    markActive(); // Count opening the app as active
     const hour = new Date().getHours();
     if (hour < 12) setGreeting('GOOD MORNING');
     else if (hour < 17) setGreeting('GOOD AFTERNOON');
@@ -41,17 +42,12 @@ export default function JournalScreen() {
     .map(e => e.mediaUri)
     .filter((uri): uri is string => !!uri);
 
-  // Calculate current week dates
+  // Calculate current week dates starting from Monday
   const today = new Date();
-  const currentDay = today.getDay(); // 0 is Sunday
-  const diff = today.getDate() - currentDay + (currentDay === 0 ? -6 : 1); // Adjust to Monday
+  const currentDay = today.getDay(); // 0 is Sunday, 1 is Monday...
+  const diff = today.getDate() - currentDay + (currentDay === 0 ? -6 : 1); 
   const monday = new Date(today.getFullYear(), today.getMonth(), diff);
-  
-  const weekDates = DAYS.map((_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return d.getDate();
-  });
+  monday.setHours(0, 0, 0, 0);
 
   const formattedDate = new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
@@ -87,40 +83,40 @@ export default function JournalScreen() {
           <Text style={styles.pageTitle}>Journal</Text>
         </View>
 
-        {/* Streak Widget (Strava Style) */}
+        {/* Streak Widget (Refined) */}
         <View style={styles.streakWidget}>
           <View style={styles.streakLeft}>
-            <View style={styles.flameContainer}>
-              <Ionicons name="flame" size={40} color={streak > 0 ? colors.streakOrange : "#8E8E93"} />
-              <Text style={styles.streakNumber}>{streak}</Text>
-            </View>
-            <Text style={styles.streakUnit}>Days</Text>
+            <Ionicons name="flame" size={40} color={streak > 0 ? colors.streakOrange : colors.textMuted} />
+            <Text style={styles.streakCountText}>
+              <Text style={styles.streakNumber}>{streak}</Text> {streak === 1 ? 'DAY' : 'DAYS'}
+            </Text>
           </View>
           <View style={styles.streakRight}>
             <Text style={styles.streakTitle}>Your streak</Text>
             <View style={styles.daysRow}>
               {DAYS.map((day, i) => {
-                const dateVal = weekDates[i];
-                const isToday = dateVal === new Date().getDate();
-                const isFuture = dateVal > new Date().getDate();
+                const dateObj = new Date(monday);
+                dateObj.setDate(monday.getDate() + i);
+                const dateVal = dateObj.getDate();
+                const dateStr = dateObj.toISOString().split('T')[0];
                 
+                const isToday = dateStr === new Date().toISOString().split('T')[0];
+                const isFuture = dateObj > new Date();
+                const isActive = activeDates.includes(dateStr);
+
                 return (
                   <View key={i} style={styles.dayColumn}>
                     <View style={[
                       styles.dayCircle, 
                       isToday && styles.todayCircle,
-                      !isToday && !isFuture && styles.pastDayCircle
+                      isActive && styles.activeDayCircle,
                     ]}>
                       <Text style={[
                         styles.dayDate, 
                         isToday && styles.todayDateText,
-                        !isToday && !isFuture && styles.pastDateText
+                        isActive && styles.activeDateText,
+                        isFuture && styles.futureDateText
                       ]}>{dateVal}</Text>
-                      {isToday && (
-                         <View style={styles.stravaIconContainer}>
-                           <MaterialCommunityIcons name="triangle" size={12} color={colors.streakOrange} />
-                         </View>
-                      )}
                     </View>
                     <Text style={styles.dayName}>{day}</Text>
                   </View>
@@ -221,40 +217,47 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   streakWidget: {
-    backgroundColor: '#1C1C1E', 
+    backgroundColor: colors.surface, 
     marginHorizontal: 20,
     borderRadius: 20,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
   streakLeft: {
     alignItems: 'center',
     paddingRight: 20,
     borderRightWidth: 1,
-    borderRightColor: '#3A3A3C',
+    borderRightColor: colors.border,
+    minWidth: 80,
   },
   flameContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  streakNumber: {
-    color: '#FFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    position: 'absolute',
-    top: 10,
-  },
-  streakUnit: {
-    color: '#8E8E93',
+  streakCountText: {
+    marginTop: 4,
     fontSize: 12,
     fontWeight: '700',
-    marginTop: 4,
+    color: colors.textSecondary,
+  },
+  streakNumber: {
+    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  streakUnit: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 2,
     textTransform: 'uppercase',
   },
   streakRight: {
@@ -262,7 +265,7 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
   },
   streakTitle: {
-    color: '#FFF',
+    color: colors.textPrimary,
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 15,
@@ -278,40 +281,42 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#2C2C2E',
+    backgroundColor: '#F2F2F7',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  pastDayCircle: {
-    backgroundColor: '#3A3A3C',
+  activeDayCircle: {
+    borderColor: '#FFD700', // Golden border for logged-in days
   },
   todayCircle: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: '#FFF', // Normal white border for today
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   dayDate: {
-    color: '#8E8E93',
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '700',
   },
-  pastDateText: {
-    color: '#FFF',
+  activeDateText: {
+    color: colors.textPrimary,
+  },
+  futureDateText: {
+    color: colors.textMuted,
   },
   todayDateText: {
-    color: '#FFF',
+    color: colors.textPrimary,
   },
   dayName: {
-    color: '#8E8E93',
+    color: colors.textSecondary,
     fontSize: 10,
     fontWeight: '600',
-  },
-  stravaIconContainer: {
-    position: 'absolute',
-    top: -12,
-    right: -8,
-    transform: [{ rotate: '180deg' }],
   },
   dateSection: {
     paddingHorizontal: 20,
