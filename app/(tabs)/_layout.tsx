@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useRef } from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -168,6 +168,19 @@ const PremiumTabButton = memo(function PremiumTabButton({
   );
 });
 
+function HeaderProfileButton() {
+  const router = useRouter();
+
+  return (
+    <Pressable
+      onPress={() => router.navigate('/profile')}
+      style={styles.headerProfileButton}
+    >
+      <Ionicons name="person-circle" size={30} color={colors.accentMint} />
+    </Pressable>
+  );
+}
+
 export default function TabLayout() {
   return (
     <Tabs
@@ -212,6 +225,7 @@ export default function TabLayout() {
           fontWeight: '700',
           color: colors.textPrimary,
         },
+        headerRight: () => <HeaderProfileButton />,
       }}
     >
       <Tabs.Screen
@@ -264,17 +278,25 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="journal"
         options={{
-          title: 'Profile',
+          title: 'Journal',
           tabBarButton: (props) => (
             <PremiumTabButton
               {...props}
-              activeIcon="person-circle"
-              inactiveIcon="person-circle-outline"
+              activeIcon="book"
+              inactiveIcon="book-outline"
               accentColor={colors.accentMint}
             />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          href: null,
+          title: 'Profile',
+          headerRight: () => null,
         }}
       />
       <Tabs.Screen
@@ -347,5 +369,9 @@ const styles = StyleSheet.create({
     width: 16,
     height: 3,
     borderRadius: 999,
+  },
+  headerProfileButton: {
+    padding: 6,
+    marginRight: 12,
   },
 });

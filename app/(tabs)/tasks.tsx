@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import { Calendar } from 'react-native-calendars';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 import { scheduleTaskReminderNotificationsAsync } from '../../lib/notifications';
 
 const { width, height } = Dimensions.get('window');
@@ -192,6 +192,7 @@ export default function TasksScreen() {
   const [focusedTask, setFocusedTask] = useState<Task | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const navigation = useNavigation();
+  const router = useRouter();
   const popAnim = useRef(new Animated.Value(0)).current;
   const myTasks = tasks.filter((t) => t.owner_id === currentUserId);
   const myTasksReminderKey = useMemo(
@@ -220,21 +221,32 @@ export default function TasksScreen() {
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Pressable 
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShowCalendar(true);
-          }} 
-          style={{ marginRight: 20, flexDirection: 'row', alignItems: 'center', padding: 8 }}
-        >
-          <Text style={{ marginRight: 4, fontWeight: '800', color: colors.streakOrange, fontSize: 17 }}>
-            {currentStreak}
-          </Text>
-          <Ionicons name="flame" size={26} color={colors.streakOrange} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowCalendar(true);
+            }}
+            style={styles.streakButton}
+          >
+            <Text style={styles.streakButtonText}>
+              {currentStreak}
+            </Text>
+            <Ionicons name="flame" size={26} color={colors.streakOrange} />
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.navigate('/profile');
+            }}
+            style={styles.profileHeaderButton}
+          >
+            <Ionicons name="person-circle" size={30} color={colors.accentMint} />
+          </Pressable>
+        </View>
       ),
     });
-  }, [currentStreak]);
+  }, [currentStreak, router]);
 
   useEffect(() => {
     if (focusedTask) {
@@ -457,6 +469,26 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
     paddingHorizontal: 24,
+  },
+  headerActions: {
+    marginRight: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  streakButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  streakButtonText: {
+    marginRight: 4,
+    fontWeight: '800',
+    color: colors.streakOrange,
+    fontSize: 17,
+  },
+  profileHeaderButton: {
+    padding: 6,
+    marginLeft: 2,
   },
   headerSection: {
     marginTop: 10,
