@@ -32,6 +32,10 @@ export default function JournalScreen() {
   const [greeting, setGreeting] = useState('GOOD MORNING');
   const [focusedMoment, setFocusedMoment] = useState<JournalEntry | null>(null);
   const [isCameraVisible, setIsCameraVisible] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showControls, setShowControls] = useState(false);
+  const controlsTimerRef = useRef<NodeJS.Timeout | null>(null);
   const popAnim = useRef(new Animated.Value(0)).current;
 
   const player = useVideoPlayer(focusedMoment?.mediaType === 'video' ? (focusedMoment.mediaUri ?? '') : '', (player) => {
@@ -47,10 +51,49 @@ export default function JournalScreen() {
         tension: 100,
         friction: 8
       }).start();
+      
+      if (focusedMoment.mediaType === 'video') {
+        setIsPlaying(true);
+        setIsMuted(false);
+        setShowControls(false);
+      }
     } else {
       popAnim.setValue(0);
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
     }
   }, [focusedMoment]);
+
+  const togglePlayPause = () => {
+    if (isPlaying) {
+      player.pause();
+    } else {
+      player.play();
+    }
+    setIsPlaying(!isPlaying);
+    
+    // Reset timer when interacting with play/pause
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
+  };
+
+  const toggleMute = () => {
+    player.muted = !isMuted;
+    setIsMuted(!isMuted);
+    
+    // Reset timer when interacting with mute
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
+  };
+
+  const handleVideoTap = () => {
+    const nextState = !showControls;
+    setShowControls(nextState);
+    
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    if (nextState) {
+      controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
+    }
+  };
 
   useEffect(() => {
     // Delay markActive slightly to ensure navigation has stabilized
@@ -275,7 +318,7 @@ export default function JournalScreen() {
         animationType="none"
         onRequestClose={() => setFocusedMoment(null)}
       >
-        <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill}>
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill}>
           <Pressable 
             style={styles.modalOverlay} 
             onPress={() => setFocusedMoment(null)}
@@ -283,14 +326,13 @@ export default function JournalScreen() {
             <View style={styles.focusContainer}>
               {focusedMoment && (
                 <>
-                  <View style={{
-                    flexDirection: 'row',
-                    gap: 12,
-                    marginBottom: 16,
-                  }}>
+                  <View style={styles.modalHeader}>
                     <Pressable 
                       style={[styles.actionButton, styles.deleteButton]} 
-                      onPress={handleDeleteMoment}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDeleteMoment();
+                      }}
                     >
                       <Ionicons name="trash" size={22} color="#FFF" />
                       <Text style={styles.actionButtonText}>Delete</Text>
@@ -298,31 +340,84 @@ export default function JournalScreen() {
 
                     <Pressable 
                       style={[styles.actionButton, styles.saveButton]} 
-                      onPress={handleSaveToGallery}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleSaveToGallery();
+                      }}
                     >
                       <Ionicons name="download-outline" size={22} color="#FFF" />
                       <Text style={styles.actionButtonText}>Save</Text>
+                    </Pressable>
+
+                    <Pressable 
+                      style={[styles.actionButton, styles.closeButton]} 
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setFocusedMoment(null);
+                      }}
+                    >
+                      <Ionicons name="close" size={26} color="#FFF" />
                     </Pressable>
                   </View>
                   
                   <View style={styles.focusedItem}>
                     {focusedMoment.mediaType === 'video' ? (
-                      <VideoView
-                        player={player}
-                        style={styles.focusedVideo}
-                        contentFit="cover"
-                        nativeControls={false}
-                        allowsFullscreen={false}
-                        allowsPictureInPicture={false}
-                      />
+                      <View style={styles.focusedVideoContainer}>
+                        <VideoView
+                          player={player}
+                          style={styles.focusedVideo}
+                          contentFit="cover"
+                          nativeControls={false}
+                          allowsFullscreen={false}
+                          allowsPictureInPicture={false}
+                        />
+                        
+                        {/* Transparent touch layer for toggling controls */}
+                        <Pressable 
+                          style={StyleSheet.absoluteFill} 
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleVideoTap();
+                          }}
+                        />
+                        
+                        {showControls && (
+                          <View style={styles.playPauseOverlay} pointerEvents="box-none">
+                            <TouchableOpacity 
+                              activeOpacity={0.8}
+                              style={styles.playPauseCircle} 
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                togglePlayPause();
+                              }}
+                            >
+                              <Ionicons 
+                                name={isPlaying ? "pause" : "play"} 
+                                size={48} 
+                                color="#FFF" 
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                        
+                        <TouchableOpacity 
+                          activeOpacity={0.8}
+                          style={styles.muteButton} 
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            toggleMute();
+                          }}
+                        >
+                          <Ionicons 
+                            name={isMuted ? "volume-mute" : "volume-high"} 
+                            size={22} 
+                            color="#FFF" 
+                          />
+                        </TouchableOpacity>
+                      </View>
                     ) : (
                       <Image source={{ uri: focusedMoment.mediaUri }} style={styles.focusedImage} />
                     )}
-                    <View style={styles.focusedOverlay}>
-                       <Text style={styles.focusedMomentText}>
-                         {focusedMoment.mediaType === 'video' ? 'Video Moment' : 'Selected Moment'}
-                       </Text>
-                    </View>
                   </View>
                 </>
               )}
@@ -633,24 +728,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   focusContainer: {
     width: width,
     height: height,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   focusedItem: {
     width: width * 0.85,
     height: height * 0.7,
     borderRadius: 32,
-    backgroundColor: 'transparent',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.4,
-    shadowRadius: 40,
-    elevation: 25,
+    backgroundColor: '#000',
   },
   focusedImage: {
     width: '100%',
@@ -662,22 +754,53 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 32,
-    backgroundColor: 'transparent',
   },
-  focusedOverlay: {
+  focusedVideoContainer: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 32,
+    overflow: 'hidden',
+  },
+  videoPressArea: {
+    flex: 1,
+  },
+  playPauseOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  playPauseCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  muteButton: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+    bottom: 20,
+    right: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
   },
-  focusedMomentText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '800',
+  modalHeader: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  closeButton: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 54,
+    paddingHorizontal: 0,
+    justifyContent: 'center',
   },
   actionButton: {
     flexDirection: 'row',
