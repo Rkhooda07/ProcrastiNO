@@ -11,13 +11,14 @@ import {
   StyleSheet,
   Text,
   View,
+  Easing,
   type PressableProps,
   type PressableStateCallbackType,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import * as Haptics from 'expo-haptics';
-import { useTaskStore } from '../../store/taskStore';
 import { useUserStore } from '../../store/userStore';
+import { useJournalStore } from '../../store/journalStore';
 import { colors } from '../../constants/colors';
 
 const { width } = Dimensions.get('window');
@@ -31,34 +32,6 @@ type PremiumTabButtonProps = PressableProps & {
   activeIcon: TabIconName;
   inactiveIcon: TabIconName;
   accentColor: string;
-};
-
-const calculateStreak = (dates: string[]) => {
-  if (!dates || dates.length === 0) return 0;
-  const sorted = [...new Set(dates)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const todayStr = today.toISOString().split('T')[0];
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
-  if (sorted[0] !== todayStr && sorted[0] !== yesterdayStr) return 0;
-  let streak = 0;
-  for (let i = 0; i < sorted.length; i++) {
-    const d = new Date(sorted[i]);
-    if (i === 0) {
-      streak = 1;
-    } else {
-      const prev = new Date(sorted[i - 1]);
-      prev.setDate(prev.getDate() - 1);
-      if (d.toISOString().split('T')[0] === prev.toISOString().split('T')[0]) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-  }
-  return streak;
 };
 
 const PremiumTabButton = memo(function PremiumTabButton({
@@ -205,9 +178,6 @@ const PremiumTabButton = memo(function PremiumTabButton({
   );
 });
 
-import { Easing, InteractionManager } from 'react-native';
-import { useJournalStore } from '../../store/journalStore';
-
 // Memoized Calendar for zero-lag month switching
 const MemoizedCalendar = memo(({ markedDates, theme, style }: any) => (
   <Calendar
@@ -249,11 +219,10 @@ function HeaderActions({ showProfile = true }: { showProfile?: boolean }) {
       }).start(() => setShowCalendar(false));
     } else {
       setShowCalendar(true);
-      // Removed InteractionManager to render everything at once
       Animated.spring(popoverAnim, {
         toValue: 1,
         useNativeDriver: true,
-        stiffness: 1800, // Extremely snappy
+        stiffness: 1800, 
         damping: 100,
         mass: 0.8,
       }).start();

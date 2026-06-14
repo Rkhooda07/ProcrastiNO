@@ -26,11 +26,17 @@ export default function JournalScreen() {
   const [greeting, setGreeting] = useState('GOOD MORNING');
   
   useEffect(() => {
-    markActive(); // Count opening the app as active
+    // Delay markActive slightly to ensure navigation has stabilized
+    const timer = setTimeout(() => {
+      markActive();
+    }, 100);
+    
     const hour = new Date().getHours();
     if (hour < 12) setGreeting('GOOD MORNING');
     else if (hour < 17) setGreeting('GOOD AFTERNOON');
     else setGreeting('GOOD EVENING');
+
+    return () => clearTimeout(timer);
   }, []);
 
   // Get today's images from the store
