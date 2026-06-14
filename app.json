@@ -27,6 +27,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow ProcrastiNO to access your camera",
+          "microphonePermission": "Allow ProcrastiNO to access your microphone",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/android-icon-monochrome.png",

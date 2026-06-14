@@ -364,13 +364,6 @@ function HeaderActions({ showProfile = true }: { showProfile?: boolean }) {
 }
 
 export default function TabLayout() {
-  const { markActive } = useJournalStore();
-
-  useEffect(() => {
-    // Synchronize streak on app load
-    markActive();
-  }, [markActive]);
-
   return (
     <Tabs
       screenOptions={{
