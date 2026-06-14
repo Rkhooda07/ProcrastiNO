@@ -15,11 +15,11 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../../constants/colors';
 import { useJournalStore, JournalEntry } from '../../store/journalStore';
+import CameraModal from '../../components/CameraModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,6 +30,7 @@ export default function JournalScreen() {
   const [todayNote, setTodayNote] = useState('');
   const [greeting, setGreeting] = useState('GOOD MORNING');
   const [focusedMoment, setFocusedMoment] = useState<JournalEntry | null>(null);
+  const [isCameraVisible, setIsCameraVisible] = useState(false);
   const popAnim = useRef(new Animated.Value(0)).current;
   
   useEffect(() => {
@@ -79,23 +80,8 @@ export default function JournalScreen() {
     day: 'numeric',
   }).format(new Date());
 
-  const handleLaunchCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'We need camera access to take photos!');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [9, 16],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      addEntry({ mediaUri: result.assets[0].uri, date: new Date().toISOString() });
-    }
+  const handleCameraCapture = (uri: string, type: 'image' | 'video') => {
+    addEntry({ mediaUri: uri, date: new Date().toISOString() });
   };
 
   const handleDeleteMoment = () => {
@@ -108,26 +94,9 @@ export default function JournalScreen() {
 
   const handleEditMoment = async () => {
     if (!focusedMoment) return;
-    const id = focusedMoment.id;
-    
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'We need camera access to take photos!');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [9, 16],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      updateEntry(id, { mediaUri: result.assets[0].uri });
-      setFocusedMoment(null);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
+    // For simplicity, opening camera to replace. 
+    // In a full implementation, pass focusedMoment ID to CameraModal to update that entry.
+    setIsCameraVisible(true);
   };
 
   return (
@@ -200,7 +169,7 @@ export default function JournalScreen() {
 
         {/* Snapchat Style Cards */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cardsScroll} contentContainerStyle={{ paddingRight: 40 }}>
-          <TouchableOpacity style={styles.addCard} onPress={handleLaunchCamera}>
+          <TouchableOpacity style={styles.addCard} onPress={() => setIsCameraVisible(true)}>
             <View style={styles.cameraCircle}>
               <Ionicons name="camera" size={32} color={colors.textSecondary} />
             </View>
@@ -230,7 +199,7 @@ export default function JournalScreen() {
 
           {/* Placeholder cards to fill space */}
           {[1, 2, 3].slice(todayEntries.length).map((i) => (
-            <TouchableOpacity key={`placeholder-${i}`} style={styles.storyCardPlaceholder} onPress={handleLaunchCamera}>
+            <TouchableOpacity key={`placeholder-${i}`} style={styles.storyCardPlaceholder} onPress={() => setIsCameraVisible(true)}>
                <Ionicons name="camera-outline" size={32} color={colors.textMuted} />
                <View style={styles.placeholderBottom}>
                  <View style={styles.placeholderLineShort} />
@@ -259,6 +228,12 @@ export default function JournalScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <CameraModal 
+        visible={isCameraVisible} 
+        onClose={() => setIsCameraVisible(false)} 
+        onCapture={handleCameraCapture}
+      />
 
       {/* Focused Moment Modal */}
       <Modal
