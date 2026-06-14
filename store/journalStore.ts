@@ -7,6 +7,7 @@ export interface JournalEntry {
   date: string;
   note?: string;
   mediaUri?: string;
+  mediaType?: 'image' | 'video';
   tags?: string[];
 }
 

@@ -81,7 +81,7 @@ export default function JournalScreen() {
   }).format(new Date());
 
   const handleCameraCapture = (uri: string, type: 'image' | 'video') => {
-    addEntry({ mediaUri: uri, date: new Date().toISOString() });
+    addEntry({ mediaUri: uri, mediaType: type, date: new Date().toISOString() });
   };
 
   const handleDeleteMoment = () => {
@@ -188,6 +188,11 @@ export default function JournalScreen() {
               <Image source={{ uri: entry.mediaUri }} style={styles.storyImage} />
               <View style={styles.storyOverlay}>
                 <View style={styles.storyHeader}>
+                   {entry.mediaType === 'video' && (
+                     <View style={[styles.storyBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+                       <Ionicons name="play" size={12} color="#FFF" />
+                     </View>
+                   )}
                    <View style={styles.storyBadge}>
                      <Ionicons name="star" size={10} color="#000" />
                    </View>
