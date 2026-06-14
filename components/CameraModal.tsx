@@ -14,17 +14,25 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const recordingTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Request both Camera and Microphone permissions
+  useEffect(() => {
+    if (!permission?.granted) {
+      requestPermission();
+    }
+  }, [permission]);
 
   if (!permission) return <View />;
   if (!permission.granted) {
     return (
-      <View style={styles.permissionContainer}>
-        <Text style={styles.text}>We need your permission to show the camera</Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.text}>Grant Permission</Text>
-        </TouchableOpacity>
-      </View>
+      <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+        <View style={styles.permissionContainer}>
+          <Text style={styles.text}>We need camera and microphone access</Text>
+          <TouchableOpacity style={styles.button} onPress={requestPermission}>
+            <Text style={styles.text}>Grant Permission</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     );
   }
 
@@ -42,10 +50,16 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
     if (cameraRef.current) {
       setIsRecording(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const video = await cameraRef.current.recordAsync({ maxDuration: 10 });
-      if (video) {
-        onCapture(video.uri, 'video');
-        onClose();
+      try {
+        const video = await cameraRef.current.recordAsync({ maxDuration: 10 });
+        if (video) {
+          onCapture(video.uri, 'video');
+          onClose();
+        }
+      } catch (error) {
+        console.error("Recording failed", error);
+      } finally {
+        setIsRecording(false);
       }
     }
   };
@@ -53,13 +67,15 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
   const stopRecording = () => {
     if (cameraRef.current && isRecording) {
       cameraRef.current.stopRecording();
-      setIsRecording(false);
     }
   };
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <CameraView style={styles.camera} ref={cameraRef} facing="back" mode="picture">
+      <View style={styles.container}>
+        <CameraView style={StyleSheet.absoluteFill} ref={cameraRef} facing="back" mode="video" />
+        
+        {/* Absolute positioned UI Overlay */}
         <View style={styles.overlay}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Ionicons name="close" size={32} color="white" />
@@ -74,15 +90,15 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
             />
           </View>
         </View>
-      </CameraView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  camera: { flex: 1 },
-  permissionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  overlay: { flex: 1, backgroundColor: 'transparent', padding: 20, justifyContent: 'space-between' },
+  container: { flex: 1 },
+  permissionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'black' },
+  overlay: { ...StyleSheet.absoluteFillObject, padding: 20, justifyContent: 'space-between' },
   closeButton: { marginTop: 40, alignSelf: 'flex-start' },
   controls: { marginBottom: 40, alignItems: 'center' },
   shutter: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'white', borderWidth: 4, borderColor: 'rgba(255,255,255,0.5)' },
