@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,22 +9,42 @@ import {
   TextInput,
   Dimensions,
   Alert,
+  Modal,
+  Animated,
+  Pressable,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import { colors } from '../../constants/colors';
-import { useJournalStore } from '../../store/journalStore';
+import { useJournalStore, JournalEntry } from '../../store/journalStore';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 export default function JournalScreen() {
-  const { entries, addEntry, streak, activeDates, markActive } = useJournalStore();
+  const { entries, addEntry, updateEntry, deleteEntry, streak, activeDates, markActive } = useJournalStore();
   const [todayNote, setTodayNote] = useState('');
   const [greeting, setGreeting] = useState('GOOD MORNING');
+  const [focusedMoment, setFocusedMoment] = useState<JournalEntry | null>(null);
+  const popAnim = useRef(new Animated.Value(0)).current;
   
+  useEffect(() => {
+    if (focusedMoment) {
+      Animated.spring(popAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8
+      }).start();
+    } else {
+      popAnim.setValue(0);
+    }
+  }, [focusedMoment]);
+
   useEffect(() => {
     // Delay markActive slightly to ensure navigation has stabilized
     const timer = setTimeout(() => {
@@ -39,20 +59,18 @@ export default function JournalScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Get today's images from the store
+  // Get today's entries with images from the store
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   
-  const todayImages = entries
-    .filter(e => new Date(e.date) >= todayStart)
-    .map(e => e.mediaUri)
-    .filter((uri): uri is string => !!uri);
+  const todayEntries = entries
+    .filter(e => new Date(e.date) >= todayStart && !!e.mediaUri);
 
   // Calculate current week dates starting from Monday
-  const today = new Date();
-  const currentDay = today.getDay(); // 0 is Sunday, 1 is Monday...
-  const diff = today.getDate() - currentDay + (currentDay === 0 ? -6 : 1); 
-  const monday = new Date(today.getFullYear(), today.getMonth(), diff);
+  const todayDate = new Date();
+  const currentDay = todayDate.getDay(); // 0 is Sunday, 1 is Monday...
+  const diff = todayDate.getDate() - currentDay + (currentDay === 0 ? -6 : 1); 
+  const monday = new Date(todayDate.getFullYear(), todayDate.getMonth(), diff);
   monday.setHours(0, 0, 0, 0);
 
   const formattedDate = new Intl.DateTimeFormat('en-US', {
@@ -77,6 +95,38 @@ export default function JournalScreen() {
 
     if (!result.canceled) {
       addEntry({ mediaUri: result.assets[0].uri, date: new Date().toISOString() });
+    }
+  };
+
+  const handleDeleteMoment = () => {
+    if (!focusedMoment) return;
+    const id = focusedMoment.id;
+    setFocusedMoment(null);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    deleteEntry(id);
+  };
+
+  const handleEditMoment = async () => {
+    if (!focusedMoment) return;
+    const id = focusedMoment.id;
+    
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'We need camera access to take photos!');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [9, 16],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      updateEntry(id, { mediaUri: result.assets[0].uri });
+      setFocusedMoment(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   };
 
@@ -157,9 +207,16 @@ export default function JournalScreen() {
             <Text style={styles.addCardText}>Capture</Text>
           </TouchableOpacity>
 
-          {todayImages.map((uri, index) => (
-            <View key={index} style={styles.storyCard}>
-              <Image source={{ uri }} style={styles.storyImage} />
+          {todayEntries.map((entry, index) => (
+            <Pressable 
+              key={entry.id} 
+              style={styles.storyCard}
+              onLongPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setFocusedMoment(entry);
+              }}
+            >
+              <Image source={{ uri: entry.mediaUri }} style={styles.storyImage} />
               <View style={styles.storyOverlay}>
                 <View style={styles.storyHeader}>
                    <View style={styles.storyBadge}>
@@ -168,11 +225,11 @@ export default function JournalScreen() {
                 </View>
                 <Text style={styles.storyText}>Moment {index + 1}</Text>
               </View>
-            </View>
+            </Pressable>
           ))}
 
           {/* Placeholder cards to fill space */}
-          {[1, 2, 3].slice(todayImages.length).map((i) => (
+          {[1, 2, 3].slice(todayEntries.length).map((i) => (
             <TouchableOpacity key={`placeholder-${i}`} style={styles.storyCardPlaceholder} onPress={handleLaunchCamera}>
                <Ionicons name="camera-outline" size={32} color={colors.textMuted} />
                <View style={styles.placeholderBottom}>
@@ -202,6 +259,73 @@ export default function JournalScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Focused Moment Modal */}
+      <Modal
+        visible={!!focusedMoment}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => setFocusedMoment(null)}
+      >
+        <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill}>
+          <Pressable 
+            style={styles.modalOverlay} 
+            onPress={() => setFocusedMoment(null)}
+          >
+            <View style={styles.focusContainer}>
+              {focusedMoment && (
+                <>
+                  <Animated.View style={{
+                    flexDirection: 'row',
+                    gap: 12,
+                    marginBottom: 16,
+                    transform: [{
+                      translateY: popAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [20, 0]
+                      })
+                    }],
+                    opacity: popAnim
+                  }}>
+                    <Pressable 
+                      style={[styles.actionButton, styles.deleteButton]} 
+                      onPress={handleDeleteMoment}
+                    >
+                      <Ionicons name="trash" size={22} color="#FFF" />
+                      <Text style={styles.actionButtonText}>Delete</Text>
+                    </Pressable>
+
+                    <Pressable 
+                      style={[styles.actionButton, styles.editButton]} 
+                      onPress={handleEditMoment}
+                    >
+                      <Ionicons name="camera-reverse" size={22} color="#FFF" />
+                      <Text style={styles.actionButtonText}>Retake</Text>
+                    </Pressable>
+                  </Animated.View>
+                  
+                  <Animated.View style={[
+                    styles.focusedItem,
+                    {
+                      transform: [{
+                        scale: popAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.9, 1]
+                        })
+                      }]
+                    }
+                  ]}>
+                    <Image source={{ uri: focusedMoment.mediaUri }} style={styles.focusedImage} />
+                    <View style={styles.focusedOverlay}>
+                       <Text style={styles.focusedMomentText}>Selected Moment</Text>
+                    </View>
+                  </Animated.View>
+                </>
+              )}
+            </View>
+          </Pressable>
+        </BlurView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -500,5 +624,67 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     lineHeight: 24,
     textAlignVertical: 'top',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  focusContainer: {
+    width: width - 48,
+    alignItems: 'center',
+  },
+  focusedItem: {
+    width: 200,
+    height: 320,
+    borderRadius: 32,
+    backgroundColor: '#000',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.3,
+    shadowRadius: 30,
+    elevation: 20,
+  },
+  focusedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  focusedOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  focusedMomentText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 18,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
+  },
+  editButton: {
+    backgroundColor: colors.accent,
+  },
+  actionButtonText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '700',
+    marginLeft: 8,
   },
 });

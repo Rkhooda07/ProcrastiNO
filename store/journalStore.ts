@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-interface JournalEntry {
+export interface JournalEntry {
   id: string;
   date: string;
   note?: string;
@@ -16,6 +16,7 @@ interface JournalState {
   streak: number;
   addEntry: (entry: Partial<JournalEntry>) => void;
   updateEntry: (id: string, entry: Partial<JournalEntry>) => void;
+  deleteEntry: (id: string) => void;
   markActive: () => void;
   calculateStreak: () => void;
 }
@@ -111,6 +112,10 @@ export const useJournalStore = create<JournalState>()(
           entries: state.entries.map((entry) =>
             entry.id === id ? { ...entry, ...updatedEntry } : entry
           ),
+        })),
+      deleteEntry: (id) =>
+        set((state) => ({
+          entries: state.entries.filter((entry) => entry.id !== id),
         })),
       markActive: () => {
         const todayStr = getTodayStr();
