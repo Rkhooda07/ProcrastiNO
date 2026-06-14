@@ -44,7 +44,8 @@
       ],
       "expo-web-browser",
       "expo-status-bar",
-      "expo-font"
+      "expo-font",
+      "expo-video"
     ],
     "extra": {
       "router": {},

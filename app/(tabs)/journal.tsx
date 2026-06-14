@@ -17,6 +17,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { colors } from '../../constants/colors';
 import { useJournalStore, JournalEntry } from '../../store/journalStore';
 import CameraModal from '../../components/CameraModal';
@@ -32,6 +33,11 @@ export default function JournalScreen() {
   const [focusedMoment, setFocusedMoment] = useState<JournalEntry | null>(null);
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const popAnim = useRef(new Animated.Value(0)).current;
+
+  const player = useVideoPlayer(focusedMoment?.mediaType === 'video' ? (focusedMoment.mediaUri ?? '') : '', (player) => {
+    player.loop = true;
+    player.play();
+  });
   
   useEffect(() => {
     if (focusedMoment) {
@@ -92,11 +98,29 @@ export default function JournalScreen() {
     deleteEntry(id);
   };
 
-  const handleEditMoment = async () => {
-    if (!focusedMoment) return;
-    // For simplicity, opening camera to replace. 
-    // In a full implementation, pass focusedMoment ID to CameraModal to update that entry.
-    setIsCameraVisible(true);
+  const handleSaveToGallery = async () => {
+    if (!focusedMoment || !focusedMoment.mediaUri) return;
+    try {
+      const MediaLibrary = require('expo-media-library');
+      if (!MediaLibrary || !MediaLibrary.saveToLibraryAsync) {
+        throw new Error('MediaLibrary module not found');
+      }
+      
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status === 'granted') {
+        await MediaLibrary.saveToLibraryAsync(focusedMoment.mediaUri);
+        Alert.alert('Success', 'Moment saved to gallery!');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Alert.alert('Permission Denied', 'Unable to save without gallery access.');
+      }
+    } catch (error) {
+      console.error('Failed to save to gallery:', error);
+      Alert.alert(
+        'Action Required', 
+        'This feature requires a new development build. Please run "npx expo run:android" or rebuild your app to enable saving to gallery.'
+      );
+    }
   };
 
   return (
@@ -180,6 +204,10 @@ export default function JournalScreen() {
             <Pressable 
               key={entry.id} 
               style={styles.storyCard}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setFocusedMoment(entry);
+              }}
               onLongPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 setFocusedMoment(entry);
@@ -255,17 +283,10 @@ export default function JournalScreen() {
             <View style={styles.focusContainer}>
               {focusedMoment && (
                 <>
-                  <Animated.View style={{
+                  <View style={{
                     flexDirection: 'row',
                     gap: 12,
                     marginBottom: 16,
-                    transform: [{
-                      translateY: popAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [20, 0]
-                      })
-                    }],
-                    opacity: popAnim
                   }}>
                     <Pressable 
                       style={[styles.actionButton, styles.deleteButton]} 
@@ -276,30 +297,33 @@ export default function JournalScreen() {
                     </Pressable>
 
                     <Pressable 
-                      style={[styles.actionButton, styles.editButton]} 
-                      onPress={handleEditMoment}
+                      style={[styles.actionButton, styles.saveButton]} 
+                      onPress={handleSaveToGallery}
                     >
-                      <Ionicons name="camera-reverse" size={22} color="#FFF" />
-                      <Text style={styles.actionButtonText}>Retake</Text>
+                      <Ionicons name="download-outline" size={22} color="#FFF" />
+                      <Text style={styles.actionButtonText}>Save</Text>
                     </Pressable>
-                  </Animated.View>
+                  </View>
                   
-                  <Animated.View style={[
-                    styles.focusedItem,
-                    {
-                      transform: [{
-                        scale: popAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.9, 1]
-                        })
-                      }]
-                    }
-                  ]}>
-                    <Image source={{ uri: focusedMoment.mediaUri }} style={styles.focusedImage} />
+                  <View style={styles.focusedItem}>
+                    {focusedMoment.mediaType === 'video' ? (
+                      <VideoView
+                        player={player}
+                        style={styles.focusedVideo}
+                        contentFit="cover"
+                        nativeControls={false}
+                        allowsFullscreen={false}
+                        allowsPictureInPicture={false}
+                      />
+                    ) : (
+                      <Image source={{ uri: focusedMoment.mediaUri }} style={styles.focusedImage} />
+                    )}
                     <View style={styles.focusedOverlay}>
-                       <Text style={styles.focusedMomentText}>Selected Moment</Text>
+                       <Text style={styles.focusedMomentText}>
+                         {focusedMoment.mediaType === 'video' ? 'Video Moment' : 'Selected Moment'}
+                       </Text>
                     </View>
-                  </Animated.View>
+                  </View>
                 </>
               )}
             </View>
@@ -611,24 +635,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   focusContainer: {
-    width: width - 48,
+    width: width,
+    height: height,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   focusedItem: {
-    width: 200,
-    height: 320,
+    width: width * 0.85,
+    height: height * 0.7,
     borderRadius: 32,
-    backgroundColor: '#000',
+    backgroundColor: 'transparent',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.3,
-    shadowRadius: 30,
-    elevation: 20,
+    shadowOpacity: 0.4,
+    shadowRadius: 40,
+    elevation: 25,
   },
   focusedImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 32,
+    resizeMode: 'cover',
+  },
+  focusedVideo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 32,
+    backgroundColor: 'transparent',
   },
   focusedOverlay: {
     position: 'absolute',
@@ -637,6 +671,8 @@ const styles = StyleSheet.create({
     right: 0,
     padding: 20,
     backgroundColor: 'rgba(0,0,0,0.3)',
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   focusedMomentText: {
     color: '#FFF',
@@ -658,7 +694,7 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: '#FF3B30',
   },
-  editButton: {
+  saveButton: {
     backgroundColor: colors.accent,
   },
   actionButtonText: {
