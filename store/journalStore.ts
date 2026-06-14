@@ -20,19 +20,26 @@ interface JournalState {
   calculateStreak: () => void;
 }
 
-const getTodayStr = () => new Date().toISOString().split('T')[0];
+const getTodayStr = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const performStreakCalculation = (activeDates: string[]) => {
   if (activeDates.length === 0) return 0;
 
   const sorted = [...new Set(activeDates)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
   
-  const todayStr = today.toISOString().split('T')[0];
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const todayStr = getTodayStr();
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const y_year = yesterdayDate.getFullYear();
+  const y_month = String(yesterdayDate.getMonth() + 1).padStart(2, '0');
+  const y_day = String(yesterdayDate.getDate()).padStart(2, '0');
+  const yesterdayStr = `${y_year}-${y_month}-${y_day}`;
 
   // If last active was not today or yesterday, streak is broken
   if (sorted[0] !== todayStr && sorted[0] !== yesterdayStr) {
@@ -40,18 +47,27 @@ const performStreakCalculation = (activeDates: string[]) => {
   }
 
   let currentStreak = 0;
-  let lastDate = new Date(sorted[0]);
+  let lastDateStr = sorted[0];
 
   for (let i = 0; i < sorted.length; i++) {
-    const d = new Date(sorted[i]);
+    const dStr = sorted[i];
     if (i === 0) {
       currentStreak = 1;
+      lastDateStr = dStr;
     } else {
-      const expected = new Date(lastDate);
-      expected.setDate(expected.getDate() - 1);
-      if (d.toISOString().split('T')[0] === expected.toISOString().split('T')[0]) {
+      // Calculate expected date (lastDate - 1 day) using manual string manipulation to stay in local time
+      const [year, month, day] = lastDateStr.split('-').map(Number);
+      const prevDate = new Date(year, month - 1, day);
+      prevDate.setDate(prevDate.getDate() - 1);
+      
+      const py = prevDate.getFullYear();
+      const pm = String(prevDate.getMonth() + 1).padStart(2, '0');
+      const pd = String(prevDate.getDate()).padStart(2, '0');
+      const expectedStr = `${py}-${pm}-${pd}`;
+
+      if (dStr === expectedStr) {
         currentStreak++;
-        lastDate = d;
+        lastDateStr = dStr;
       } else {
         break;
       }
@@ -99,6 +115,7 @@ export const useJournalStore = create<JournalState>()(
       markActive: () => {
         const todayStr = getTodayStr();
         const { activeDates } = get();
+        
         if (!activeDates.includes(todayStr)) {
           const nextActiveDates = [...activeDates, todayStr];
           const nextStreak = performStreakCalculation(nextActiveDates);
@@ -106,6 +123,12 @@ export const useJournalStore = create<JournalState>()(
             activeDates: nextActiveDates, 
             streak: nextStreak 
           });
+        } else {
+          // Even if already marked, recalculate streak to ensure it's up to date with the current "today"
+          const currentStreak = performStreakCalculation(activeDates);
+          if (currentStreak !== get().streak) {
+            set({ streak: currentStreak });
+          }
         }
       },
       calculateStreak: () => {

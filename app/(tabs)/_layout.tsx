@@ -178,6 +178,40 @@ const PremiumTabButton = memo(function PremiumTabButton({
   );
 });
 
+// Custom Day Component for refined highlighting
+const CustomDay = memo(({ date, state, markedDates }: any) => {
+  const dateStr = date.dateString;
+  
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+  
+  const isToday = dateStr === todayStr;
+  const isActive = markedDates[dateStr]?.selected;
+  const isDisabled = state === 'disabled';
+
+  return (
+    <View style={styles.customDayContainer}>
+      <View style={[
+        styles.customDayCircle,
+        (isActive && !isToday) && styles.activeDayCircle,
+        isToday && styles.todayCircle,
+      ]}>
+        <Text style={[
+          styles.customDayText,
+          (isActive && !isToday) && styles.activeDayText,
+          isToday && styles.todayDayText,
+          isDisabled && styles.disabledDayText
+        ]}>
+          {date.day}
+        </Text>
+      </View>
+    </View>
+  );
+});
+
 // Memoized Calendar for zero-lag month switching
 const MemoizedCalendar = memo(({ markedDates, theme, style }: any) => (
   <Calendar
@@ -187,6 +221,9 @@ const MemoizedCalendar = memo(({ markedDates, theme, style }: any) => (
     style={style}
     hideExtraDays={true}
     disableMonthChange={false}
+    dayComponent={({ date, state }: any) => (
+      <CustomDay date={date} state={state} markedDates={markedDates} />
+    )}
   />
 ));
 
@@ -327,6 +364,13 @@ function HeaderActions({ showProfile = true }: { showProfile?: boolean }) {
 }
 
 export default function TabLayout() {
+  const { markActive } = useJournalStore();
+
+  useEffect(() => {
+    // Synchronize streak on app load
+    markActive();
+  }, [markActive]);
+
   return (
     <Tabs
       screenOptions={{
@@ -584,5 +628,49 @@ const styles = StyleSheet.create({
   },
   popoverCalendar: {
     borderRadius: 12,
+  },
+  customDayContainer: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  customDayCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  activeDayCircle: {
+    backgroundColor: '#FFCC00', // Warm yellow fill for active days
+    borderColor: '#FFCC00',
+  },
+  todayCircle: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFCC00',
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  customDayText: {
+    fontSize: 14,
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
+  activeDayText: {
+    color: '#1C1C1E', // Dark text on yellow background
+  },
+  todayDayText: {
+    color: '#2C2C2A',
+    fontWeight: '800',
+  },
+  disabledDayText: {
+    color: colors.textMuted,
   },
 });

@@ -104,9 +104,19 @@ export default function JournalScreen() {
                 const dateObj = new Date(monday);
                 dateObj.setDate(monday.getDate() + i);
                 const dateVal = dateObj.getDate();
-                const dateStr = dateObj.toISOString().split('T')[0];
                 
-                const isToday = dateStr === new Date().toISOString().split('T')[0];
+                const y = dateObj.getFullYear();
+                const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const d = String(dateObj.getDate()).padStart(2, '0');
+                const dateStr = `${y}-${m}-${d}`;
+                
+                const todayObj = new Date();
+                const ty = todayObj.getFullYear();
+                const tm = String(todayObj.getMonth() + 1).padStart(2, '0');
+                const td = String(todayObj.getDate()).padStart(2, '0');
+                const todayStr = `${ty}-${tm}-${td}`;
+                
+                const isToday = dateStr === todayStr;
                 const isFuture = dateObj > new Date();
                 const isActive = activeDates.includes(dateStr);
 
@@ -114,13 +124,13 @@ export default function JournalScreen() {
                   <View key={i} style={styles.dayColumn}>
                     <View style={[
                       styles.dayCircle, 
+                      (isActive && !isToday) && styles.activeDayCircle,
                       isToday && styles.todayCircle,
-                      isActive && styles.activeDayCircle,
                     ]}>
                       <Text style={[
                         styles.dayDate, 
+                        (isActive && !isToday) && styles.activeDateText,
                         isToday && styles.todayDateText,
-                        isActive && styles.activeDateText,
                         isFuture && styles.futureDateText
                       ]}>{dateVal}</Text>
                     </View>
@@ -295,15 +305,20 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   activeDayCircle: {
-    borderColor: '#FFD700', // Golden border for logged-in days
+    backgroundColor: '#FFCC00', // Warm yellow fill for active days
+    borderColor: '#FFCC00',
+    borderRadius: 25, 
   },
   todayCircle: {
-    borderColor: '#FFF', // Normal white border for today
+    backgroundColor: '#FFF', // Solid white background for today
+    borderColor: '#FFCC00', // Yellow outline as requested
+    borderWidth: 1.5,
+    borderRadius: 16, 
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 0 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
   dayDate: {
     color: colors.textSecondary,
@@ -311,13 +326,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   activeDateText: {
-    color: colors.textPrimary,
+    color: '#1C1C1E', // Dark text on yellow background
   },
   futureDateText: {
     color: colors.textMuted,
   },
   todayDateText: {
-    color: colors.textPrimary,
+    color: '#2C2C2A', // Dark text for today
   },
   dayName: {
     color: colors.textSecondary,
