@@ -8,58 +8,16 @@ import { colors } from '../../constants/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import { useJournalStore } from '../../store/journalStore';
 
 const { width } = Dimensions.get('window');
 
-const calculateStreak = (dates: string[]) => {
-  if (!dates || dates.length === 0) return 0;
-  const sorted = [...new Set(dates)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  
-  const todayStr = today.toISOString().split('T')[0];
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
-  
-  if (sorted[0] !== todayStr && sorted[0] !== yesterdayStr) return 0;
-  
-  let streak = 0;
-  for (let i = 0; i < sorted.length; i++) {
-    const d = new Date(sorted[i]);
-    if (i === 0) {
-      streak = 1;
-    } else {
-      const prev = new Date(sorted[i-1]);
-      prev.setDate(prev.getDate() - 1);
-      if (d.toISOString().split('T')[0] === prev.toISOString().split('T')[0]) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-  }
-  return streak;
-};
-
 export default function ProfileScreen() {
   const { currentUserId, currentUserName, profilePics, uploadProfilePic } = useUserStore();
-  const { tasks, completedDates, fetchStreakData } = useTaskStore();
-  const [loading, setLoading] = useState(true);
+  const { tasks } = useTaskStore();
+  const { streak } = useJournalStore();
+  const [loading, setLoading] = useState(false);
   const [isSavingPhoto, setIsSavingPhoto] = useState(false);
-
-  useEffect(() => {
-    if (currentUserId) {
-      loadData();
-    }
-  }, [currentUserId]);
-
-  async function loadData() {
-    setLoading(true);
-    await fetchStreakData(currentUserId!);
-    setLoading(false);
-  }
 
   const pickImage = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -83,8 +41,6 @@ export default function ProfileScreen() {
   const myTasksToday = tasks.filter(t => t.owner_id === currentUserId);
   const myCompletedToday = myTasksToday.filter(t => t.is_done).length;
   const myProgress = myTasksToday.length > 0 ? myCompletedToday / myTasksToday.length : 0;
-
-  const myStreak = calculateStreak(completedDates);
 
   const myPfp = currentUserId ? profilePics[currentUserId] : null;
 
@@ -123,7 +79,7 @@ export default function ProfileScreen() {
           <Text style={styles.userName}>{currentUserName}</Text>
           <View style={styles.streakBadge}>
             <Ionicons name="flame" size={20} color={colors.streakOrange} />
-            <Text style={styles.streakText}>{myStreak}-day streak</Text>
+            <Text style={styles.streakText}>{streak}-day streak</Text>
           </View>
         </View>
 
