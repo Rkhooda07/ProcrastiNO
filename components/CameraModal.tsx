@@ -16,6 +16,7 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
   const cameraRef = useRef<CameraView>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [mode, setMode] = useState<'picture' | 'video'>('video');
+  const [facing, setFacing] = useState<'back' | 'front'>('back');
 
   useEffect(() => {
     if (visible) {
@@ -27,6 +28,11 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
   }, [visible, permission, micPermission]);
 
   if (!permission || !micPermission) return <View />;
+
+  const toggleFacing = () => {
+    setFacing(prev => (prev === 'back' ? 'front' : 'back'));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
 
   const takePicture = async () => {
     if (cameraRef.current && !isRecording) {
@@ -84,7 +90,7 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
           <CameraView 
             style={StyleSheet.absoluteFill} 
             ref={cameraRef} 
-            facing="back" 
+            facing={facing} 
             mode={mode}
           />
         ) : (
@@ -107,6 +113,12 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Ionicons name="close" size={32} color="white" />
           </TouchableOpacity>
+
+          {!isRecording && (
+            <TouchableOpacity style={styles.flipButton} onPress={toggleFacing}>
+              <Ionicons name="camera-reverse-outline" size={28} color="white" />
+            </TouchableOpacity>
+          )}
           
           <View style={styles.controls} pointerEvents="box-none">
             <View style={styles.shutterContainer}>
@@ -146,6 +158,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: 20,
     padding: 4
+  },
+  flipButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 20,
+    padding: 6
   },
   controls: { 
     position: 'absolute',
