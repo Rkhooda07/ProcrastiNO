@@ -12,6 +12,7 @@ import {
   Modal,
   Animated,
   Pressable,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -64,12 +65,15 @@ export default function JournalScreen() {
   }, [focusedMoment]);
 
   const togglePlayPause = () => {
-    if (isPlaying) {
-      player.pause();
-    } else {
-      player.play();
-    }
-    setIsPlaying(!isPlaying);
+    setIsPlaying(prev => {
+      const next = !prev;
+      if (next) {
+        player.play();
+      } else {
+        player.pause();
+      }
+      return next;
+    });
     
     // Reset timer when interacting with play/pause
     if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
@@ -77,8 +81,11 @@ export default function JournalScreen() {
   };
 
   const toggleMute = () => {
-    player.muted = !isMuted;
-    setIsMuted(!isMuted);
+    setIsMuted(prev => {
+      const next = !prev;
+      player.muted = next;
+      return next;
+    });
     
     // Reset timer when interacting with mute
     if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
@@ -86,13 +93,14 @@ export default function JournalScreen() {
   };
 
   const handleVideoTap = () => {
-    const nextState = !showControls;
-    setShowControls(nextState);
-    
-    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-    if (nextState) {
-      controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
-    }
+    setShowControls(prev => {
+      const nextState = !prev;
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+      if (nextState) {
+        controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
+      }
+      return nextState;
+    });
   };
 
   useEffect(() => {
@@ -360,65 +368,68 @@ export default function JournalScreen() {
                     </Pressable>
                   </View>
                   
-                  <View style={styles.focusedItem}>
-                    {focusedMoment.mediaType === 'video' ? (
-                      <View style={styles.focusedVideoContainer}>
-                        <VideoView
-                          player={player}
-                          style={styles.focusedVideo}
-                          contentFit="cover"
-                          nativeControls={false}
-                          allowsFullscreen={false}
-                          allowsPictureInPicture={false}
-                        />
-                        
-                        {/* Transparent touch layer for toggling controls */}
-                        <Pressable 
-                          style={StyleSheet.absoluteFill} 
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            handleVideoTap();
-                          }}
-                        />
-                        
-                        {showControls && (
-                          <View style={styles.playPauseOverlay} pointerEvents="box-none">
-                            <TouchableOpacity 
-                              activeOpacity={0.8}
-                              style={styles.playPauseCircle} 
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                togglePlayPause();
-                              }}
-                            >
-                              <Ionicons 
-                                name={isPlaying ? "pause" : "play"} 
-                                size={48} 
-                                color="#FFF" 
-                              />
-                            </TouchableOpacity>
-                          </View>
-                        )}
-                        
-                        <TouchableOpacity 
-                          activeOpacity={0.8}
-                          style={styles.muteButton} 
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            toggleMute();
-                          }}
-                        >
-                          <Ionicons 
-                            name={isMuted ? "volume-mute" : "volume-high"} 
-                            size={22} 
-                            color="#FFF" 
+                  <TouchableWithoutFeedback 
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      if (focusedMoment.mediaType === 'video') {
+                        handleVideoTap();
+                      }
+                    }}
+                  >
+                    <View style={styles.focusedItem}>
+                      {focusedMoment.mediaType === 'video' ? (
+                        <View style={styles.focusedVideoContainer}>
+                          <VideoView
+                            player={player}
+                            style={styles.focusedVideo}
+                            contentFit="cover"
+                            nativeControls={false}
+                            allowsFullscreen={false}
+                            allowsPictureInPicture={false}
+                            pointerEvents="none"
                           />
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <Image source={{ uri: focusedMoment.mediaUri }} style={styles.focusedImage} />
-                    )}
-                  </View>
+                          
+                          {/* Play/Pause button in center */}
+                          {showControls && (
+                            <View style={styles.playPauseOverlay} pointerEvents="box-none">
+                              <TouchableOpacity 
+                                activeOpacity={0.7}
+                                style={styles.playPauseCircle} 
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  togglePlayPause();
+                                }}
+                              >
+                                <Ionicons 
+                                  name={isPlaying ? "pause" : "play"} 
+                                  size={48} 
+                                  color="#FFF" 
+                                />
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                          
+                          {/* Mute button in bottom right */}
+                          <TouchableOpacity 
+                            activeOpacity={0.7}
+                            style={styles.muteButton} 
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              toggleMute();
+                            }}
+                          >
+                            <Ionicons 
+                              name={isMuted ? "volume-mute" : "volume-high"} 
+                              size={22} 
+                              color="#FFF" 
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <Image source={{ uri: focusedMoment.mediaUri }} style={styles.focusedImage} />
+                      )}
+                    </View>
+                  </TouchableWithoutFeedback>
                 </>
               )}
             </View>
@@ -754,12 +765,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 32,
+    overflow: 'hidden',
   },
   focusedVideoContainer: {
     width: '100%',
     height: '100%',
     borderRadius: 32,
     overflow: 'hidden',
+    backgroundColor: '#000',
   },
   videoPressArea: {
     flex: 1,

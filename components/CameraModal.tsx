@@ -15,27 +15,27 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const cameraRef = useRef<CameraView>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [isPreparing, setIsPreparing] = useState(false);
-  const [mode, setMode] = useState<'picture' | 'video'>('picture');
+  const [mode, setMode] = useState<'picture' | 'video'>('video');
 
   useEffect(() => {
     if (visible) {
       if (!permission?.granted) requestPermission();
       if (!micPermission?.granted) requestMicPermission();
-      // Reset to picture mode when opening
-      setMode('picture');
+      // Default to video mode so we are always ready for instant recording/photo
+      setMode('video');
     }
   }, [visible, permission, micPermission]);
 
   if (!permission || !micPermission) return <View />;
 
   const takePicture = async () => {
-    // Prevent taking picture while preparing for video or recording
-    if (cameraRef.current && !isRecording && !isPreparing) {
+    if (cameraRef.current && !isRecording) {
       try {
+        // Haptic feedback for shutter
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const photo = await cameraRef.current.takePictureAsync({ 
           quality: 0.8,
-          skipProcessing: false // Set to false to ensure a valid image is produced
+          skipProcessing: true // Speed up photo capture
         });
         if (photo) {
           onCapture(photo.uri, 'image');
@@ -49,49 +49,29 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
 
   const startRecording = async () => {
     if (cameraRef.current && !isRecording) {
-      setIsPreparing(true);
-      // Switch to video mode first
-      setMode('video');
-      
-      // Give Android a moment to switch hardware modes
-      setTimeout(async () => {
-        try {
-          setIsRecording(true);
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          const video = await cameraRef.current!.recordAsync({ 
-            maxDuration: 15,
-          });
-          if (video) {
-            onCapture(video.uri, 'video');
-            onClose();
-          }
-        } catch (error) {
-          console.error("Recording failed", error);
-        } finally {
-          setIsRecording(false);
-          setIsPreparing(false);
+      try {
+        setIsRecording(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        const video = await cameraRef.current.recordAsync({ 
+          maxDuration: 15,
+        });
+        
+        if (video) {
+          onCapture(video.uri, 'video');
+          onClose();
         }
-      }, 300); // 300ms buffer for mode switch
+      } catch (error) {
+        console.error("Recording failed", error);
+        setIsRecording(false);
+      }
     }
   };
 
   const stopRecording = () => {
-    if (cameraRef.current && (isRecording || isPreparing)) {
-      // If we released too early (during preparation), just reset
-      if (isPreparing && !isRecording) {
-        setIsPreparing(false);
-        setMode('picture');
-        return;
-      }
-
-      // Safety delay to ensure data production
-      setTimeout(() => {
-        if (cameraRef.current && isRecording) {
-          cameraRef.current.stopRecording();
-          setIsRecording(false);
-          setMode('picture');
-        }
-      }, 800);
+    if (cameraRef.current && isRecording) {
+      cameraRef.current.stopRecording();
+      setIsRecording(false);
     }
   };
 
@@ -131,15 +111,15 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
           <View style={styles.controls} pointerEvents="box-none">
             <View style={styles.shutterContainer}>
               <TouchableOpacity
-                style={[styles.shutter, (isRecording || isPreparing) && styles.recording]}
+                style={[styles.shutter, isRecording && styles.recording]}
                 onPress={takePicture}
                 onLongPress={startRecording}
                 onPressOut={stopRecording}
-                delayLongPress={300}
-                activeOpacity={0.7}
+                delayLongPress={200}
+                activeOpacity={0.8}
               />
               <Text style={styles.hintText}>
-                {isRecording || isPreparing ? 'Release to stop' : 'Tap for photo, Hold for video'}
+                {isRecording ? 'Release to stop' : 'Tap for photo, Hold for video'}
               </Text>
             </View>
           </View>
