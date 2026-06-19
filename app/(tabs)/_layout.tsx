@@ -8,6 +8,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  TouchableWithoutFeedback,
   StyleSheet,
   Text,
   View,
@@ -321,41 +322,43 @@ function HeaderActions({ showProfile = true }: { showProfile?: boolean }) {
           hardwareAccelerated={true}
         >
           <Pressable style={styles.modalOverlay} onPress={toggleCalendar}>
-            <Animated.View
-              style={[
-                styles.popoverContainer,
-                {
-                  opacity: popoverAnim,
-                  transform: [
-                    {
-                      scale: popoverAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.97, 1],
-                      }),
-                    },
-                    {
-                      translateY: popoverAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-8, 0],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <View style={styles.popoverArrow} />
-              <View style={styles.popoverContent}>
-                <View style={styles.popoverHeader}>
-                   <Text style={styles.popoverTitle}>{streak} Day Streak!</Text>
-                   <Text style={styles.popoverSubtitle}>Keep it up, {currentUserName}!</Text>
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <Animated.View
+                style={[
+                  styles.popoverContainer,
+                  {
+                    opacity: popoverAnim,
+                    transform: [
+                      {
+                        scale: popoverAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.97, 1],
+                        }),
+                      },
+                      {
+                        translateY: popoverAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-8, 0],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <View style={styles.popoverArrow} />
+                <View style={styles.popoverContent}>
+                  <View style={styles.popoverHeader}>
+                     <Text style={styles.popoverTitle}>{streak} Day Streak!</Text>
+                     <Text style={styles.popoverSubtitle}>Keep it up, {currentUserName}!</Text>
+                  </View>
+                  <MemoizedCalendar
+                    markedDates={markedDates}
+                    theme={calendarTheme}
+                    style={styles.popoverCalendar}
+                  />
                 </View>
-                <MemoizedCalendar
-                  markedDates={markedDates}
-                  theme={calendarTheme}
-                  style={styles.popoverCalendar}
-                />
-              </View>
-            </Animated.View>
+              </Animated.View>
+            </TouchableWithoutFeedback>
           </Pressable>
         </Modal>
       )}

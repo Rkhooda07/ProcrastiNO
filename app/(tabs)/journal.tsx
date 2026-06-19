@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { colors } from '../../constants/colors';
 import { useJournalStore, JournalEntry } from '../../store/journalStore';
+import { useUserStore } from '../../store/userStore';
 import CameraModal from '../../components/CameraModal';
 
 const { width, height } = Dimensions.get('window');
@@ -29,6 +30,7 @@ const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 export default function JournalScreen() {
   const { entries, addEntry, updateEntry, deleteEntry, streak, activeDates, markActive } = useJournalStore();
+  const { currentUserName } = useUserStore();
   const [todayNote, setTodayNote] = useState('');
   const [greeting, setGreeting] = useState('GOOD MORNING');
   const [focusedMoment, setFocusedMoment] = useState<JournalEntry | null>(null);
@@ -180,7 +182,7 @@ export default function JournalScreen() {
         {/* Simplified Header/Greeting */}
         <View style={styles.greetingSection}>
           <Text style={styles.greetingText}>{greeting}</Text>
-          <Text style={styles.pageTitle}>Journal</Text>
+          <Text style={styles.pageTitle}>{currentUserName || 'User'}</Text>
         </View>
 
         {/* Streak Widget (Refined) */}
