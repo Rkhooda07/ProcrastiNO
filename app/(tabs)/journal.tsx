@@ -13,12 +13,14 @@ import {
   Animated,
   Pressable,
   TouchableWithoutFeedback,
+  Platform,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useNavigation } from 'expo-router';
 import { colors } from '../../constants/colors';
 import { useJournalStore, JournalEntry } from '../../store/journalStore';
 import { useUserStore } from '../../store/userStore';
@@ -36,9 +38,31 @@ export default function JournalScreen() {
   const [focusedMoment, setFocusedMoment] = useState<JournalEntry | null>(null);
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    // Hide/show parent tab bar dynamically
+    navigation.getParent()?.setOptions({
+      tabBarStyle: isCameraVisible
+        ? { display: 'none' }
+        : {
+            position: 'absolute',
+            height: Platform.OS === 'ios' ? 104 : 84,
+            paddingTop: 0,
+            paddingBottom: 0,
+            backgroundColor: 'transparent',
+            borderTopWidth: 0,
+            elevation: 0,
+          },
+    });
+    // Hide/show header dynamically
+    navigation.setOptions({
+      headerShown: !isCameraVisible,
+    });
+  }, [isCameraVisible, navigation]);
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(false);
-  const controlsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsTimerRef = useRef<any>(null);
   const popAnim = useRef(new Animated.Value(0)).current;
 
   const player = useVideoPlayer(focusedMoment?.mediaType === 'video' ? (focusedMoment.mediaUri ?? '') : '', (player) => {
@@ -177,8 +201,9 @@ export default function JournalScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+    <View style={styles.container}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Simplified Header/Greeting */}
         <View style={styles.greetingSection}>
           <Text style={styles.greetingText}>{greeting}</Text>
@@ -314,6 +339,7 @@ export default function JournalScreen() {
           </View>
         </View>
       </ScrollView>
+    </SafeAreaView>
 
       <CameraModal 
         visible={isCameraVisible} 
@@ -386,7 +412,6 @@ export default function JournalScreen() {
                             style={styles.focusedVideo}
                             contentFit="cover"
                             nativeControls={false}
-                            allowsFullscreen={false}
                             allowsPictureInPicture={false}
                             pointerEvents="none"
                           />
@@ -438,7 +463,7 @@ export default function JournalScreen() {
           </Pressable>
         </BlurView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -446,6 +471,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  safeArea: {
+    flex: 1,
   },
   scrollContent: {
     paddingBottom: 60,
@@ -780,7 +808,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   playPauseOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
