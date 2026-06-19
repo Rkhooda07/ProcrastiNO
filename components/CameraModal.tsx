@@ -88,16 +88,8 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
 
   const prepareAndStartRecording = () => {
     setMode('video');
-    
-    // Clear any existing timeout
-    if (recordingTimeoutRef.current) {
-      clearTimeout(recordingTimeoutRef.current);
-    }
-    
-    recordingTimeoutRef.current = setTimeout(() => {
-      recordingTimeoutRef.current = null;
-      startVideoRecording();
-    }, 100);
+    // Start recording immediately without artificial delay
+    startVideoRecording();
   };
 
   const startVideoRecording = async () => {
@@ -150,6 +142,13 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
   const hasPermissions = permission?.granted && micPermission?.granted;
 
   // Gestures
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .runOnJS(true)
+    .onEnd(() => {
+      toggleFacing();
+    });
+
   const tapGesture = Gesture.Tap()
     .maxDuration(250)
     .runOnJS(true)
@@ -201,13 +200,15 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
     >
       <GestureHandlerRootView style={StyleSheet.absoluteFill}>
         {hasPermissions ? (
-          <CameraView
-            style={StyleSheet.absoluteFill}
-            ref={cameraRef}
-            facing={facing}
-            mode={mode}
-            onCameraReady={onCameraReady}
-          />
+          <GestureDetector gesture={doubleTapGesture}>
+            <CameraView
+              style={StyleSheet.absoluteFill}
+              ref={cameraRef}
+              facing={facing}
+              mode={mode}
+              onCameraReady={onCameraReady}
+            />
+          </GestureDetector>
         ) : (
           visible && (
             <View style={styles.permissionContainer}>
@@ -232,26 +233,25 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
               <Ionicons name="close" size={32} color="white" />
             </TouchableOpacity>
 
-            {!isRecording && (
-              <TouchableOpacity style={styles.flipButton} onPress={toggleFacing}>
-                <Ionicons name="camera-reverse-outline" size={28} color="white" />
-              </TouchableOpacity>
-            )}
-
-            {isRecording && (
-              <View style={styles.progressBarContainer}>
-                <Animated.View style={[styles.progressBar, animatedProgressStyle]} />
-              </View>
-            )}
-
             <View style={styles.controls} pointerEvents="box-none">
               <View style={styles.shutterContainer} pointerEvents="box-none">
-                <GestureDetector gesture={composedGesture}>
-                  <View style={styles.shutterTouchable} pointerEvents="box-none">
-                    <Animated.View style={[styles.shutterOuter, outerAnimatedStyle]} />
-                    <Animated.View style={[styles.shutterInner, innerAnimatedStyle, isRecording && styles.shutterInnerRecording]} />
-                  </View>
-                </GestureDetector>
+                <View style={styles.shutterRow} pointerEvents="box-none">
+                  {/* Shutter Button */}
+                  <GestureDetector gesture={composedGesture}>
+                    <View style={styles.shutterTouchable} pointerEvents="box-none">
+                      <Animated.View style={[styles.shutterOuter, outerAnimatedStyle]} />
+                      <Animated.View style={[styles.shutterInner, innerAnimatedStyle, isRecording && styles.shutterInnerRecording]} />
+                    </View>
+                  </GestureDetector>
+
+                  {/* Flip Button placed to the right of shutter */}
+                  {!isRecording && (
+                    <TouchableOpacity style={styles.bottomFlipButton} onPress={toggleFacing}>
+                      <Ionicons name="camera-reverse-outline" size={28} color="white" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
                 <Text style={styles.hintText}>
                   {isRecording ? 'Release to stop' : 'Tap for photo, Hold for video'}
                 </Text>
@@ -308,33 +308,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 4,
   },
-  flipButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 20,
-    padding: 6,
-  },
-  progressBarContainer: {
-    position: 'absolute',
-    top: 100,
-    left: 20,
-    right: 20,
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 2,
-    overflow: 'hidden',
-    zIndex: 30,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#FF3B30',
-  },
   controls: {
     position: 'absolute',
-    bottom: 50,
+    bottom: 90,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -343,6 +319,24 @@ const styles = StyleSheet.create({
   shutterContainer: {
     alignItems: 'center',
     gap: 12,
+  },
+  shutterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    gap: 50,
+  },
+  shutterSpacer: {
+    width: 50,
+  },
+  bottomFlipButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   shutterTouchable: {
     width: 100,
