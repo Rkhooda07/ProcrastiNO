@@ -11,7 +11,7 @@ import { useReminderStore } from '../store/reminderStore';
 
 export default function RootLayout() {
   const { hasChosenUser, _hasHydrated, currentUserId, resetUser } = useUserStore();
-  const segments = useSegments();
+  const segments = useSegments() as string[];
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
   const fetchReminderSettings = useReminderStore((state) => state.fetchSettings);

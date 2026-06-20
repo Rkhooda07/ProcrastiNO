@@ -50,6 +50,7 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
         const video = await cameraRef.current.recordAsync({
           maxDuration: 30,
           quality: '720p',
+          mirror: facing === 'front',
         } as any);
         if (video) {
           onCapture(video.uri, 'video');
@@ -139,12 +140,15 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
           // Attempt optimized capture
           photo = (await cameraRef.current.takePictureAsync({
             quality: 0.5,
-            skipProcessing: true,
+            skipProcessing: facing === 'back',
+            mirror: facing === 'front',
           } as any)) as any;
         } catch (firstError) {
           console.warn("Optimized photo capture failed, falling back to standard capture:", firstError);
           // Fallback to standard capture
-          photo = (await cameraRef.current.takePictureAsync()) as any;
+          photo = (await cameraRef.current.takePictureAsync({
+            mirror: facing === 'front',
+          })) as any;
         }
         
         if (photo) {
@@ -226,6 +230,7 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
               ref={cameraRef}
               facing={facing}
               mode={mode}
+              mirror={facing === 'front'}
               onCameraReady={onCameraReady}
             />
           </GestureDetector>
