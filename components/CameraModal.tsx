@@ -260,10 +260,7 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
 
             <View style={styles.controls} pointerEvents="box-none">
               <View style={styles.shutterContainer} pointerEvents="box-none">
-                {/* Hint Text placed above shutter controls */}
-                <Text style={styles.hintText}>
-                  {isRecording ? 'Release to stop' : 'Tap for photo, Hold for video'}
-                </Text>
+
                 <View style={styles.shutterRow} pointerEvents="box-none">
                   {/* Shutter Button */}
                   <GestureDetector gesture={composedGesture}
@@ -276,7 +273,7 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
 
                   {/* Flip Button positioned next to shutter */}
                   <TouchableOpacity
-                    style={[styles.bottomFlipButton, { opacity: isRecording ? 0 : 1, marginLeft: 8 }]}
+                    style={[styles.bottomFlipButton, { opacity: isRecording ? 0 : 1, marginLeft: 20, marginRight: 18 }]}
                     onPress={toggleFacing}
                   >
                     <Ionicons name="camera-reverse-outline" size={28} color="white" />

@@ -38,15 +38,20 @@ export default function RootLayout() {
     const inSelectionGroup = segments[0] === 'select-user';
     const isAtRoot = segments.length === 0 || (segments.length === 1 && segments[0] === '');
 
+    let timerId: NodeJS.Timeout | null = null;
     if (!hasChosenUser && !inSelectionGroup) {
-      setTimeout(() => {
+      timerId = setTimeout(() => {
         router.replace('/select-user');
       }, 10);
     } else if (hasChosenUser && (inSelectionGroup || isAtRoot)) {
-      setTimeout(() => {
+      timerId = setTimeout(() => {
         router.replace('/tasks');
       }, 10);
     }
+    // Cleanup any pending timer when the effect re‑runs or component unmounts
+    return () => {
+      if (timerId) clearTimeout(timerId);
+    };
   }, [navigationReady, _hasHydrated, hasChosenUser, segments, currentUserId]);
 
   useEffect(() => {
@@ -75,11 +80,12 @@ export default function RootLayout() {
     const redirectFromNotification = (notification: any) => {
       const url = notification?.request?.content?.data?.url;
       if (typeof url === 'string') {
-        setTimeout(() => {
+        const navTimer = setTimeout(() => {
           if (navigationReady) {
             router.push(url as any);
           }
         }, 10);
+        return () => clearTimeout(navTimer);
       }
     };
 
