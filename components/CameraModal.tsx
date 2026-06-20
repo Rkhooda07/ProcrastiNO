@@ -27,10 +27,81 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
   
   const [isRecording, setIsRecording] = useState(false);
   const isRecordingRef = useRef(false);
+  const isPressingRef = useRef(false);
   const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [cameraReady, setCameraReady] = useState(false);
+
   const [mode, setMode] = useState<'picture' | 'video'>('picture');
-  const recordingTimeoutRef = useRef<any>(null);
+  const recordingStartTimeRef = useRef<number>(0);
+
+  const startVideoRecording = async () => {
+    if (cameraRef.current && !isRecordingRef.current) {
+      isRecordingRef.current = true;
+      setIsRecording(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+
+      // Animate progress bar over 30s
+      ringProgress.value = withTiming(1, { duration: 30000 });
+
+      // Track the actual start time of the recording
+      recordingStartTimeRef.current = Date.now();
+
+      try {
+        const video = await cameraRef.current.recordAsync({
+          maxDuration: 30,
+          quality: '720p',
+        } as any);
+        if (video) {
+          onCapture(video.uri, 'video');
+          onClose();
+        }
+      } catch (error) {
+        console.error('Recording failed:', error);
+      } finally {
+        isRecordingRef.current = false;
+        setIsRecording(false);
+        ringProgress.value = withTiming(0, { duration: 200 });
+      }
+    }
+  };
+
+  const prepareAndStartRecording = () => {
+    isPressingRef.current = true;
+    setMode('video');
+    
+    // We add a 350ms delay for camera reconfig from picture mode to video mode.
+    setTimeout(() => {
+      if (isPressingRef.current) {
+        startVideoRecording();
+      }
+    }, 350);
+  };
+
+  const stopVideoRecording = async () => {
+    isPressingRef.current = false;
+    
+    // If recording never started, reset mode
+    if (!isRecordingRef.current) {
+      setMode('picture');
+      return;
+    }
+    const minDuration = 600; // ensure at least 0.6s of data
+    const elapsed = Date.now() - recordingStartTimeRef.current;
+    const delay = elapsed < minDuration ? minDuration - elapsed : 0;
+    // wait the remaining time if needed
+    await new Promise(resolve => setTimeout(resolve, delay));
+    if (cameraRef.current && isRecordingRef.current) {
+      try {
+        await cameraRef.current.stopRecording();
+      } catch (e) {
+        console.error('Error stopping recording:', e);
+      }
+      isRecordingRef.current = false;
+      setIsRecording(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setMode('picture');
+    }
+  };
   
   const readyOpacity = useSharedValue(0);
   const innerScale = useSharedValue(1);
@@ -86,58 +157,7 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
     }
   };
 
-  const prepareAndStartRecording = () => {
-    setMode('video');
-    // Start recording immediately without artificial delay
-    startVideoRecording();
-  };
-
-  const startVideoRecording = async () => {
-    if (cameraRef.current && !isRecordingRef.current) {
-      isRecordingRef.current = true;
-      setIsRecording(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      
-      // Animate progress bar over 30s
-      ringProgress.value = withTiming(1, { duration: 30000 });
-      
-      try {
-        const video = await cameraRef.current.recordAsync({
-          maxDuration: 30,
-          quality: '720p',
-        } as any);
-        if (video) {
-          onCapture(video.uri, 'video');
-          onClose();
-        }
-      } catch (error) {
-        console.error('Recording failed:', error);
-      } finally {
-        isRecordingRef.current = false;
-        setIsRecording(false);
-        ringProgress.value = withTiming(0, { duration: 200 });
-        setMode('picture');
-      }
-    }
-  };
-
-  const stopVideoRecording = () => {
-    // If recording hasn't actually started yet (user released early within 100ms)
-    if (recordingTimeoutRef.current) {
-      clearTimeout(recordingTimeoutRef.current);
-      recordingTimeoutRef.current = null;
-      setMode('picture');
-      return;
-    }
-
-    if (cameraRef.current && isRecordingRef.current) {
-      cameraRef.current.stopRecording();
-      isRecordingRef.current = false;
-      setIsRecording(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setMode('picture');
-    }
-  };
+// Old recording handlers removed – using new implementations defined earlier
 
   const hasPermissions = permission?.granted && micPermission?.granted;
 
@@ -235,23 +255,28 @@ export default function CameraModal({ visible, onClose, onCapture }: CameraModal
 
             <View style={styles.controls} pointerEvents="box-none">
               <View style={styles.shutterContainer} pointerEvents="box-none">
+                {/* Hint Text placed above shutter controls */}
+                <Text style={styles.hintText}>
+                  {isRecording ? 'Release to stop' : 'Tap for photo, Hold for video'}
+                </Text>
                 <View style={styles.shutterRow} pointerEvents="box-none">
                   {/* Shutter Button */}
-                  <GestureDetector gesture={composedGesture}>
+                  <GestureDetector gesture={composedGesture}
+                    >
                     <View style={styles.shutterTouchable} pointerEvents="box-none">
                       <Animated.View style={[styles.shutterOuter, outerAnimatedStyle]} />
                       <Animated.View style={[styles.shutterInner, innerAnimatedStyle, isRecording && styles.shutterInnerRecording]} />
                     </View>
                   </GestureDetector>
 
-                  {/* Flip Button placed to the right of shutter */}
-                  {!isRecording && (
-                    <TouchableOpacity style={styles.bottomFlipButton} onPress={toggleFacing}>
-                      <Ionicons name="camera-reverse-outline" size={28} color="white" />
-                    </TouchableOpacity>
-                  )}
+                  {/* Flip Button positioned next to shutter */}
+                  <TouchableOpacity
+                    style={[styles.bottomFlipButton, { opacity: isRecording ? 0 : 1, marginLeft: 8 }]}
+                    onPress={toggleFacing}
+                  >
+                    <Ionicons name="camera-reverse-outline" size={28} color="white" />
+                  </TouchableOpacity>
                 </View>
-
                 <Text style={styles.hintText}>
                   {isRecording ? 'Release to stop' : 'Tap for photo, Hold for video'}
                 </Text>
@@ -325,7 +350,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    gap: 50,
+    gap: 8,
   },
   shutterSpacer: {
     width: 50,
